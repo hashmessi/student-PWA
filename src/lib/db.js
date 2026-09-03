@@ -1,4 +1,5 @@
 import { openDB } from 'idb'
+import { isSupabaseConfigured, getSupabase } from './supabase'
 
 const DB_NAME = 'FaceCaptureDB'
 const DB_VERSION = 1
@@ -29,20 +30,53 @@ export function getDb() {
 }
 
 /**
- * Check if a regNo already exists in IndexedDB.
+ * Check if a regNo already exists in IndexedDB or Supabase Cloud.
  * @param {string} regNo
  * @returns {Promise<{exists: boolean, isComplete: boolean, student: object|null}>}
  */
 export async function checkRegNo(regNo) {
   if (!regNo) return { exists: false, isComplete: false, student: null }
+  const normalized = regNo.toUpperCase()
   const db = await getDb()
-  const student = await db.get('studentMeta', regNo.toUpperCase())
-  if (!student) return { exists: false, isComplete: false, student: null }
-  return {
-    exists: true,
-    isComplete: student.status === 'complete',
-    student,
+  const localStudent = await db.get('studentMeta', normalized)
+  if (localStudent) {
+    return {
+      exists: true,
+      isComplete: localStudent.status === 'complete',
+      student: localStudent,
+    }
   }
+
+  // Check Supabase Cloud if configured
+  try {
+    if (isSupabaseConfigured()) {
+      const client = getSupabase()
+      if (client) {
+        const { data } = await client
+          .from('students')
+          .select('reg_no, name, dept, section, status')
+          .eq('reg_no', normalized)
+          .maybeSingle()
+        if (data) {
+          return {
+            exists: true,
+            isComplete: data.status === 'complete',
+            student: {
+              regNo: data.reg_no,
+              name: data.name,
+              dept: data.dept,
+              section: data.section,
+              status: data.status,
+            },
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // Non-blocking fallback
+  }
+
+  return { exists: false, isComplete: false, student: null }
 }
 
 /**

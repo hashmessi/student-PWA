@@ -85,21 +85,27 @@ export async function generateExportZip(onProgress) {
     const poses = ['front', 'left', 'right', 'overall'];
     let validCount = 0;
 
-    for (const pose of poses) {
-      let blob = null;
-      if (images && images[pose]) {
-        blob = images[pose].blob || images[pose];
-      }
-
-      // Fallback: download from Supabase storage URL
-      if (!blob && student.photoUrls && student.photoUrls[pose]) {
-        try {
-          blob = await fetchImageBlob(student.photoUrls[pose]);
-        } catch (downloadErr) {
-          console.warn(`Failed to download ${pose} for ${student.regNo}:`, downloadErr);
+    // Fetch all 4 poses in parallel for high export speed
+    const poseBlobs = await Promise.all(
+      poses.map(async (pose) => {
+        let blob = null;
+        if (images && images[pose]) {
+          blob = images[pose].blob || images[pose];
         }
-      }
 
+        // Fallback: download from Supabase storage URL
+        if (!blob && student.photoUrls && student.photoUrls[pose]) {
+          try {
+            blob = await fetchImageBlob(student.photoUrls[pose]);
+          } catch (downloadErr) {
+            console.warn(`Failed to download ${pose} for ${student.regNo}:`, downloadErr);
+          }
+        }
+        return { pose, blob };
+      })
+    );
+
+    for (const { pose, blob } of poseBlobs) {
       if (blob) {
         studentFolder.file(`${pose}.jpg`, blob);
         validCount++;
