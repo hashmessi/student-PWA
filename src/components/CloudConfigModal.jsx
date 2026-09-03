@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getSupabaseConfig, saveSupabaseConfig, testSupabaseConnection } from '../lib/supabase'
+import { getSupabaseConfig, saveSupabaseConfig, testSupabaseConnection, normalizeSupabaseUrl } from '../lib/supabase'
 import { useToast } from './ToastContext'
 
 export default function CloudConfigModal({ isOpen, onClose, onConfigSaved }) {
@@ -29,8 +29,11 @@ export default function CloudConfigModal({ isOpen, onClose, onConfigSaved }) {
     setTesting(true)
     setStatusMessage(null)
 
-    // Temporarily save to test
-    saveSupabaseConfig(url, anonKey)
+    const normalized = normalizeSupabaseUrl(url)
+    setUrl(normalized)
+
+    // Save formatted URL & Key
+    saveSupabaseConfig(normalized, anonKey)
 
     try {
       await testSupabaseConnection()
@@ -48,7 +51,9 @@ export default function CloudConfigModal({ isOpen, onClose, onConfigSaved }) {
   }
 
   const handleSave = () => {
-    saveSupabaseConfig(url, anonKey)
+    const normalized = normalizeSupabaseUrl(url)
+    setUrl(normalized)
+    saveSupabaseConfig(normalized, anonKey)
     show('Cloud sync settings saved!', 'success')
     if (onConfigSaved) onConfigSaved()
     onClose()

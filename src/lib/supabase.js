@@ -4,6 +4,22 @@ const STORAGE_KEY_URL = 'student_pwa_supabase_url'
 const STORAGE_KEY_ANON = 'student_pwa_supabase_anon_key'
 
 /**
+ * Formats user input into a complete Supabase HTTPS endpoint URL.
+ * Accepts full URLs (https://xyz.supabase.co), domain names, or project ref IDs (yeikfafilyhqjcavzqov).
+ */
+export function normalizeSupabaseUrl(input) {
+  if (!input) return ''
+  let trimmed = input.trim()
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed
+  }
+  if (trimmed.includes('.supabase.co')) {
+    return `https://${trimmed}`
+  }
+  return `https://${trimmed}.supabase.co`
+}
+
+/**
  * Retrieves Supabase configuration from environment variables or localStorage.
  */
 export function getSupabaseConfig() {
@@ -13,18 +29,23 @@ export function getSupabaseConfig() {
   const localUrl = localStorage.getItem(STORAGE_KEY_URL) || ''
   const localAnon = localStorage.getItem(STORAGE_KEY_ANON) || ''
 
-  const url = (localUrl || envUrl).trim()
+  const rawUrl = (localUrl || envUrl).trim()
+  const url = normalizeSupabaseUrl(rawUrl)
   const anonKey = (localAnon || envAnon).trim()
 
-  return { url, anonKey }
+  return { url, anonKey, rawUrl }
 }
 
 /**
  * Saves or updates custom Supabase credentials from UI settings.
  */
 export function saveSupabaseConfig(url, anonKey) {
-  if (url) localStorage.setItem(STORAGE_KEY_URL, url.trim())
-  else localStorage.removeItem(STORAGE_KEY_URL)
+  if (url) {
+    const cleanUrl = normalizeSupabaseUrl(url)
+    localStorage.setItem(STORAGE_KEY_URL, cleanUrl)
+  } else {
+    localStorage.removeItem(STORAGE_KEY_URL)
+  }
 
   if (anonKey) localStorage.setItem(STORAGE_KEY_ANON, anonKey.trim())
   else localStorage.removeItem(STORAGE_KEY_ANON)
