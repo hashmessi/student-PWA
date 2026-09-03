@@ -591,6 +591,17 @@ code { font-family: var(--font-mono); font-size: 0.875em; }
   border-radius: var(--r-sm);
 }
 
+/* ── Keyframe Animations ─────────────────────────────────── */
+@keyframes shutter-flash {
+  0% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* ── Safe areas (mobile) ─────────────────────────────────── */
 .pb-safe { padding-bottom: max(var(--space-6), env(safe-area-inset-bottom)); }
 .pt-safe { padding-top: max(var(--space-3), env(safe-area-inset-top)); }

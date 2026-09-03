@@ -3,6 +3,8 @@ import './index.css'
 import { ToastProvider, useToast } from './components/ToastContext'
 import RegistrationForm from './components/RegistrationForm'
 import StudentList from './components/StudentList'
+import CameraCapture from './components/CameraCapture'
+import ReviewScreen from './components/ReviewScreen'
 
 // PWA Install Prompt Banner
 function InstallPrompt() {
@@ -14,7 +16,6 @@ function InstallPrompt() {
     const handler = (e) => {
       e.preventDefault()
       setDeferredPrompt(e)
-      // Only show if not in standalone display mode
       if (!window.matchMedia('(display-mode: standalone)').matches) {
         setVisible(true)
       }
@@ -69,7 +70,7 @@ function InstallPrompt() {
           Install Web App
         </div>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          Install for fast offline dataset collection
+          Add to home screen for fast offline dataset collection
         </div>
       </div>
       <button
@@ -95,21 +96,50 @@ function InstallPrompt() {
 function AppContent() {
   const [page, setPage] = useState('list') // 'list' | 'register' | 'capture' | 'review'
   const [activeStudent, setActiveStudent] = useState(null)
+  const [activeCaptures, setActiveCaptures] = useState({})
+  const [retakePoseIndex, setRetakePoseIndex] = useState(0)
   const { show } = useToast()
 
-  const handleCompleteRegistration = (student) => {
+  // 1. When registration completes, transition straight to guided camera capture
+  const handleRegistrationComplete = (student) => {
     setActiveStudent(student)
-    // Phase 1 scope: Save student details to IndexedDB and show success notification
-    // Phase 2 will transition directly to 'capture'
-    show(`Registered ${student.name} (${student.regNo}) successfully!`, 'success')
-    setPage('list')
+    setActiveCaptures({})
+    setRetakePoseIndex(0)
+    setPage('capture')
+  }
+
+  // 2. When all 4 poses in camera capture finish, transition to Review
+  const handleCaptureComplete = (student, captures) => {
+    setActiveStudent(student)
+    setActiveCaptures(captures)
+    setPage('review')
+  }
+
+  // 3. When operator selects "Retake" on a specific pose from Review
+  const handleRetakePose = (poseIndex) => {
+    setRetakePoseIndex(poseIndex)
+    setPage('capture')
+  }
+
+  // 4. When dataset is confirmed and saved in Review
+  const handleDatasetSaved = () => {
     setActiveStudent(null)
+    setActiveCaptures({})
+    setPage('list')
   }
 
   return (
     <div className="app-shell pt-safe pb-safe">
       <header className="app-header">
-        <div className="app-header-icon" aria-hidden="true">📸</div>
+        <div
+          className="app-header-icon"
+          aria-hidden="true"
+          onClick={() => setPage('list')}
+          style={{ cursor: 'pointer' }}
+          title="Return to Dashboard"
+        >
+          📸
+        </div>
         <div style={{ flex: 1 }}>
           <div className="app-header-title">Student Face Capture</div>
           <div className="app-header-subtitle">Smart Attendance · IT Department</div>
@@ -117,7 +147,7 @@ function AppContent() {
         <span className="badge badge--success" style={{ fontSize: '0.65rem' }}>Offline Ready</span>
       </header>
 
-      <InstallPrompt />
+      {page === 'list' && <InstallPrompt />}
 
       <main>
         {page === 'list' && (
@@ -140,7 +170,37 @@ function AppContent() {
               setActiveStudent(null)
               setPage('list')
             }}
-            onComplete={handleCompleteRegistration}
+            onComplete={handleRegistrationComplete}
+          />
+        )}
+
+        {page === 'capture' && activeStudent && (
+          <CameraCapture
+            student={activeStudent}
+            initialPoseIndex={retakePoseIndex}
+            onCancel={() => {
+              // Return to list or review depending on whether we already have captures
+              if (Object.keys(activeCaptures).length === 4) {
+                setPage('review')
+              } else {
+                setPage('list')
+              }
+            }}
+            onComplete={handleCaptureComplete}
+          />
+        )}
+
+        {page === 'review' && activeStudent && (
+          <ReviewScreen
+            student={activeStudent}
+            captures={activeCaptures}
+            onRetakePose={handleRetakePose}
+            onCancel={() => {
+              setActiveStudent(null)
+              setActiveCaptures({})
+              setPage('list')
+            }}
+            onSaved={handleDatasetSaved}
           />
         )}
       </main>

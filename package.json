@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vladmandic/face-api": "^1.7.15",
     "idb": "^8.0.2",
     "jszip": "^3.10.1",
     "react": "^18.3.1",
