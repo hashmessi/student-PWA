@@ -15,19 +15,19 @@ function validateField(field, value) {
   const trimmed = typeof value === 'string' ? value.trim() : ''
   switch (field) {
     case 'name':
-      if (!trimmed) return 'Full name is required'
+      if (!trimmed) return 'Full student name is required'
       if (!/^[a-zA-Z\s.'-]{2,60}$/.test(trimmed)) return 'Letters and spaces only (2–60 chars)'
       return ''
     case 'regNo':
       if (!trimmed) return 'Registration number is required'
-      if (!/^[A-Za-z0-9]{4,20}$/.test(trimmed)) return 'Alphanumeric institution format (4–20 chars)'
+      if (!/^[A-Za-z0-9]{4,20}$/.test(trimmed)) return 'Alphanumeric format (4–20 chars, e.g. 21IT001)'
       return ''
     case 'section':
-      if (!value) return 'Please select a section'
+      if (!value) return 'Please assign an academic section'
       return ''
     case 'email':
-      if (!trimmed) return 'College email is required'
-      if (!EMAIL_DOMAIN_REGEX.test(trimmed)) return 'Enter a valid college email format'
+      if (!trimmed) return 'College email address is required'
+      if (!EMAIL_DOMAIN_REGEX.test(trimmed)) return 'Enter a valid institutional email (e.g. name@college.edu)'
       return ''
     default:
       return ''
@@ -37,13 +37,18 @@ function validateField(field, value) {
 function FormField({ id, label, required, error, hint, children }) {
   return (
     <div className="form-group">
-      <label htmlFor={id} className="form-label">
-        <span>{label}</span>
-        {required && <span className="required">Required</span>}
+      <label htmlFor={id} className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>
+          {label} {required && <span style={{ color: 'var(--accent-hover)', fontWeight: 700 }}>*</span>}
+        </span>
       </label>
       {children}
-      {error && <div className="form-error" role="alert"><span>⚠</span> {error}</div>}
-      {hint && !error && <div className="form-hint">{hint}</div>}
+      {error && (
+        <div className="form-error" role="alert" style={{ marginTop: '4px' }}>
+          <span>⚠</span> {error}
+        </div>
+      )}
+      {hint && !error && <div className="form-hint" style={{ marginTop: '2px' }}>{hint}</div>}
     </div>
   )
 }
@@ -170,6 +175,9 @@ export default function RegistrationForm({ student, onBack, onComplete }) {
     return classes.join(' ')
   }
 
+  const cleanName = form.name.trim().replace(/[^a-zA-Z0-9]/g, '')
+  const folderPreview = form.regNo.trim() ? `${form.regNo.trim().toUpperCase()}_${cleanName || 'StudentName'}` : ''
+
   return (
     <>
       {showConsent && (
@@ -181,33 +189,41 @@ export default function RegistrationForm({ student, onBack, onComplete }) {
 
       <div className="page">
         {/* Navigation Bar */}
-        <div className="row-between" style={{ marginBottom: 'var(--space-5)' }}>
+        <div className="row-between" style={{ marginBottom: 'var(--space-4)' }}>
           <button
             id="reg-form-back-btn"
             className="btn btn--ghost btn--sm"
             onClick={onBack}
             aria-label="Go back to student list"
           >
-            ← Back
+            ← Back to Roster
           </button>
           <div>
             {isEdit ? (
-              <span className="badge badge--warning">✏ Editing Record</span>
+              <span className="badge badge--warning">✏ Updating Record</span>
             ) : (
-              <span className="badge badge--accent">+ New Registration</span>
+              <span className="badge badge--accent font-mono">Step 1 · Registration</span>
             )}
           </div>
         </div>
 
         {/* Header Title */}
-        <div style={{ marginBottom: 'var(--space-6)' }}>
-          <h1 style={{ fontSize: '1.625rem', marginBottom: 'var(--space-1)' }}>
-            {isEdit ? 'Update Student' : 'Student Registration'}
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <h1 style={{ fontSize: '1.625rem', marginBottom: '4px', letterSpacing: '-0.02em' }}>
+            {isEdit ? 'Update Student Record' : 'Student Biometric Registration'}
           </h1>
-          <p style={{ fontSize: '0.875rem' }}>
-            Enter verified academic credentials before commencing photo capture.
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+            Enter verified academic credentials. All 4 captured photos will be strictly isolated under this student's identity.
           </p>
         </div>
+
+        {/* Live Folder Preview Pill */}
+        {folderPreview && (
+          <div className="folder-preview-pill" style={{ marginBottom: 'var(--space-5)' }}>
+            <span>📁 Training Target:</span>
+            <strong style={{ color: '#ffffff' }}>students/{folderPreview}/</strong>
+          </div>
+        )}
 
         {/* Duplicate Record Warning Card */}
         {duplicateWarning && (
@@ -234,9 +250,9 @@ export default function RegistrationForm({ student, onBack, onComplete }) {
 
             <p style={{ fontSize: '0.8125rem', marginBottom: 'var(--space-4)', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
               <span className="font-mono" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{duplicateWarning.student.regNo}</span>
-              {' '}— {duplicateWarning.student.name} ({duplicateWarning.student.dept}-{duplicateWarning.student.section}) is already registered.
+              {' '}— {duplicateWarning.student.name} ({duplicateWarning.student.dept}-{duplicateWarning.student.section}) is already registered in local storage.
               {duplicateWarning.isComplete
-                ? ' Overwriting will allow recapturing all 4 face images for this student.'
+                ? ' Recapturing will overwrite the existing 4 biometric images for this student.'
                 : ' You can continue capturing images where this student left off.'}
             </p>
 
@@ -275,16 +291,16 @@ export default function RegistrationForm({ student, onBack, onComplete }) {
         <form
           id="student-registration-form"
           onSubmit={handleSubmit}
-          className="stack-5"
+          className="stack-4"
           noValidate
         >
           {/* Full Name */}
-          <FormField id="field-name" label="Full Name" required error={errors.name}>
+          <FormField id="field-name" label="Full Student Name" required error={errors.name}>
             <input
               id="field-name"
               type="text"
               className={getInputClass('name')}
-              placeholder="e.g. Hashvanth Kumar"
+              placeholder="e.g. Rahul Sharma"
               value={form.name}
               onChange={e => handleChange('name', e.target.value)}
               onBlur={() => handleBlur('name')}
@@ -299,7 +315,7 @@ export default function RegistrationForm({ student, onBack, onComplete }) {
             label="Registration Number (Reg.No)"
             required
             error={errors.regNo}
-            hint="Unique alphanumeric student ID (e.g. 21IT001)"
+            hint="Primary dataset key (e.g. 21IT001)"
           >
             <input
               id="field-regno"
@@ -327,7 +343,7 @@ export default function RegistrationForm({ student, onBack, onComplete }) {
                     onChange={e => handleChange('dept', e.target.value)}
                     onBlur={() => handleBlur('dept')}
                   >
-                    {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    {DEPARTMENTS.map(d => <option key={d} value={d}>Dept: {d}</option>)}
                   </select>
                 </div>
               </FormField>
@@ -357,7 +373,7 @@ export default function RegistrationForm({ student, onBack, onComplete }) {
             label="College Email ID"
             required
             error={errors.email}
-            hint="Student official domain email address"
+            hint="Institutional verification email"
           >
             <input
               id="field-email"
@@ -379,8 +395,13 @@ export default function RegistrationForm({ student, onBack, onComplete }) {
               type="submit"
               className="btn btn--primary btn--full btn--lg"
               disabled={isSubmitting}
+              style={{
+                boxShadow: '0 4px 18px var(--accent-glow)',
+                fontSize: '1rem',
+                padding: '14px 20px'
+              }}
             >
-              {isSubmitting ? 'Saving Record…' : 'Proceed to Face Capture →'}
+              {isSubmitting ? 'Saving Student Record…' : 'Proceed to Biometric Camera →'}
             </button>
           </div>
         </form>

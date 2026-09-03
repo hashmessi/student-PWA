@@ -196,3 +196,166 @@ export async function getDatabaseStats() {
     totalPhotos: photoKeys.length,
   }
 }
+
+/**
+ * Creates a synthetic 720x720 biometric canvas image blob for demo purposes.
+ */
+function createDemoFaceBlob(name, regNo, poseTitle, yawDirection = 0) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 720
+    canvas.height = 720
+    const ctx = canvas.getContext('2d')
+
+    // Background gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, 720, 720)
+    bgGrad.addColorStop(0, '#0f172a')
+    bgGrad.addColorStop(1, '#1e1b4b')
+    ctx.fillStyle = bgGrad
+    ctx.fillRect(0, 0, 720, 720)
+
+    // Biometric Grid lines
+    ctx.strokeStyle = 'rgba(99, 102, 241, 0.12)'
+    ctx.lineWidth = 1
+    for (let x = 40; x < 720; x += 40) {
+      ctx.beginPath()
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, 720)
+      ctx.stroke()
+    }
+    for (let y = 40; y < 720; y += 40) {
+      ctx.beginPath()
+      ctx.moveTo(0, y)
+      ctx.lineTo(720, y)
+      ctx.stroke()
+    }
+
+    // Oval Guide Outline
+    ctx.strokeStyle = 'rgba(34, 211, 160, 0.35)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.ellipse(360, 340, 160, 220, 0, 0, 2 * Math.PI)
+    ctx.stroke()
+
+    // Face Silhouette
+    const offsetX = yawDirection * 45
+    ctx.fillStyle = 'rgba(129, 140, 248, 0.22)'
+    ctx.beginPath()
+    ctx.ellipse(360 + offsetX, 340, 145, 195, 0, 0, 2 * Math.PI)
+    ctx.fill()
+
+    // Biometric Features (Eyes, Nose, Mouth)
+    ctx.fillStyle = '#f8fafc'
+    // Eyes
+    ctx.beginPath()
+    ctx.arc(315 + offsetX, 310, 12, 0, 2 * Math.PI)
+    ctx.arc(405 + offsetX, 310, 12, 0, 2 * Math.PI)
+    ctx.fill()
+
+    // Pupils
+    ctx.fillStyle = '#6366f1'
+    ctx.beginPath()
+    ctx.arc(315 + offsetX + (yawDirection * 3), 310, 5, 0, 2 * Math.PI)
+    ctx.arc(405 + offsetX + (yawDirection * 3), 310, 5, 0, 2 * Math.PI)
+    ctx.fill()
+
+    // Nose bridge
+    ctx.strokeStyle = '#94a3b8'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.moveTo(360 + offsetX, 320)
+    ctx.lineTo(360 + offsetX + (yawDirection * 8), 365)
+    ctx.lineTo(352 + offsetX, 370)
+    ctx.stroke()
+
+    // Mouth
+    ctx.beginPath()
+    ctx.arc(360 + offsetX, 415, 24, 0.1 * Math.PI, 0.9 * Math.PI)
+    ctx.stroke()
+
+    // Target Crosshairs
+    ctx.strokeStyle = '#22d3a0'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(350, 340); ctx.lineTo(370, 340)
+    ctx.moveTo(360, 330); ctx.lineTo(360, 350)
+    ctx.stroke()
+
+    // Technical Watermark Header & Footer
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 22px Inter, sans-serif'
+    ctx.fillText(`${name} (${regNo})`, 36, 56)
+
+    ctx.font = '600 16px "JetBrains Mono", monospace'
+    ctx.fillStyle = '#22d3a0'
+    ctx.fillText(`BIOMETRIC POSE: ${poseTitle.toUpperCase()}`, 36, 84)
+
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = '14px "JetBrains Mono", monospace'
+    ctx.fillText('STANDARDIZED: 720×720 @ 85% · YAW ESTIMATION PASSED', 36, 680)
+
+    canvas.toBlob((blob) => {
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+      resolve({ blob, dataUrl, width: 720, height: 720 })
+    }, 'image/jpeg', 0.85)
+  })
+}
+
+/**
+ * Seeds realistic sample students with complete 4-pose photo datasets for testing.
+ */
+export async function seedDemoStudents() {
+  const demoList = [
+    {
+      regNo: '21IT001',
+      name: 'Aarav Sharma',
+      dept: 'IT',
+      section: 'A',
+      email: 'aarav.sharma@college.edu',
+      status: 'complete',
+    },
+    {
+      regNo: '21IT002',
+      name: 'Ananya Rao',
+      dept: 'IT',
+      section: 'B',
+      email: 'ananya.rao@college.edu',
+      status: 'pending',
+    },
+    {
+      regNo: '21IT003',
+      name: 'Rohan Varma',
+      dept: 'IT',
+      section: 'A',
+      email: 'rohan.varma@college.edu',
+      status: 'complete',
+    },
+  ]
+
+  for (const student of demoList) {
+    if (student.status === 'complete') {
+      const front = await createDemoFaceBlob(student.name, student.regNo, 'Front Pose (0°)', 0)
+      const left = await createDemoFaceBlob(student.name, student.regNo, 'Left Pose (~45°)', -1)
+      const right = await createDemoFaceBlob(student.name, student.regNo, 'Right Pose (~45°)', 1)
+      const overall = await createDemoFaceBlob(student.name, student.regNo, 'Overall Clear', 0)
+
+      await saveStudentCompleteDataset(student, { front, left, right, overall })
+    } else {
+      await saveStudent(student)
+    }
+  }
+
+  return demoList
+}
+
+/**
+ * Clears all records from IndexedDB (for development/reset).
+ */
+export async function clearAllStudents() {
+  const db = await getDb()
+  const tx = db.transaction(['studentMeta', 'photoBlobs'], 'readwrite')
+  await tx.objectStore('studentMeta').clear()
+  await tx.objectStore('photoBlobs').clear()
+  await tx.done
+}
+

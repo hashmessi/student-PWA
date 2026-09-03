@@ -278,7 +278,7 @@ export default function CameraCapture({
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: 'rgba(7, 7, 12, 0.9)',
+            background: 'rgba(7, 7, 12, 0.92)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -286,18 +286,27 @@ export default function CameraCapture({
             gap: '12px',
             color: 'var(--text-primary)'
           }}>
-            <div style={{ fontSize: '28px', animation: 'spin 1.2s linear infinite' }}>⚙️</div>
-            <div style={{ fontSize: '0.9375rem', fontWeight: 600 }}>Loading Offline Face Models…</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Initializing WASM neural detector</div>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              border: '3px solid rgba(99, 102, 241, 0.2)',
+              borderTopColor: 'var(--accent)',
+              animation: 'spin 0.8s linear infinite'
+            }} />
+            <div style={{ fontSize: '0.9375rem', fontWeight: 600 }}>Loading Offline Neural Models…</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+              TinyFaceDetector (WASM) · Local Cache
+            </div>
           </div>
         )}
 
-        {/* Camera Permission Error */}
+        {/* Camera Permission Error with Troubleshooting Hint */}
         {cameraError && (
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: 'rgba(7, 7, 12, 0.95)',
+            background: 'rgba(7, 7, 12, 0.96)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -306,11 +315,26 @@ export default function CameraCapture({
             textAlign: 'center',
             gap: '12px'
           }}>
-            <div style={{ fontSize: '32px' }}>📷</div>
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--danger)' }}>Camera Unavailable</div>
-            <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>{cameraError}</div>
-            <button className="btn btn--primary btn--sm" onClick={startCamera}>
-              Retry Camera
+            <div style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '50%',
+              background: 'var(--danger-subtle)',
+              border: '1px solid rgba(239,68,68,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '22px',
+              color: 'var(--danger)'
+            }}>
+              ⛔
+            </div>
+            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--danger)' }}>Camera Access Blocked</div>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', maxWidth: '320px', lineHeight: '1.45' }}>
+              {cameraError} Check the camera permissions icon in your browser address bar and grant access to continue.
+            </div>
+            <button className="btn btn--primary btn--sm" onClick={startCamera} style={{ marginTop: '4px' }}>
+              Retry Camera Connection
             </button>
           </div>
         )}
@@ -327,21 +351,23 @@ export default function CameraCapture({
             width: '38px',
             height: '38px',
             borderRadius: '50%',
-            background: 'rgba(22, 22, 30, 0.75)',
+            background: 'rgba(22, 22, 30, 0.8)',
             border: '1px solid rgba(255,255,255,0.2)',
             backdropFilter: 'blur(8px)',
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '18px',
             cursor: 'pointer',
-            zIndex: 10
+            zIndex: 10,
+            transition: 'transform 0.15s ease'
           }}
-          aria-label="Switch camera"
-          title="Switch Camera"
+          aria-label="Switch between front and back camera"
+          title="Switch Camera (Front/Rear)"
         >
-          🔄
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 2.21.895 4.21 2.343 5.657L4 18h6v-6l-2.343 2.343C6.643 13.328 6 11.745 6 10c0-3.314 2.686-6 6-6s6 2.686 6 6c0 1.745-.643 3.328-1.657 4.343L14 12v6h6l-2.343-2.343C19.105 14.21 20 12.21 20 10z"/>
+          </svg>
         </button>
       </div>
 

@@ -165,13 +165,21 @@ function AppContent() {
           style={{ cursor: 'pointer' }}
           title="Return to Student List"
         >
-          📸
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent-hover)' }}>
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
         </div>
         <div style={{ flex: 1 }}>
           <div className="app-header-title">Student Face Capture</div>
-          <div className="app-header-subtitle">Smart Attendance · IT Department</div>
+          <div className="app-header-subtitle">Smart Attendance · Dept of IT</div>
         </div>
-        <span className="badge badge--success" style={{ fontSize: '0.65rem' }}>Offline Ready</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="badge badge--success" style={{ fontSize: '0.6875rem', letterSpacing: '0.04em' }}>
+            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 8px var(--success)' }} />
+            OFFLINE VAULT
+          </span>
+        </div>
       </header>
 
       {page === 'list' && <InstallPrompt />}
