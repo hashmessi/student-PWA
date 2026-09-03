@@ -97,34 +97,57 @@ function AppContent() {
   const [page, setPage] = useState('list') // 'list' | 'register' | 'capture' | 'review'
   const [activeStudent, setActiveStudent] = useState(null)
   const [activeCaptures, setActiveCaptures] = useState({})
-  const [retakePoseIndex, setRetakePoseIndex] = useState(0)
-  const { show } = useToast()
+  const [isRetakeMode, setIsRetakeMode] = useState(false)
+  const [targetPoseIndex, setTargetPoseIndex] = useState(0)
 
-  // 1. When registration completes, transition straight to guided camera capture
+  // 1. Initial registration completed -> Go to camera capture for all 4 poses
   const handleRegistrationComplete = (student) => {
     setActiveStudent(student)
     setActiveCaptures({})
-    setRetakePoseIndex(0)
+    setIsRetakeMode(false)
+    setTargetPoseIndex(0)
     setPage('capture')
   }
 
-  // 2. When all 4 poses in camera capture finish, transition to Review
+  // 2. All 4 poses captured -> Go to review screen
   const handleCaptureComplete = (student, captures) => {
     setActiveStudent(student)
     setActiveCaptures(captures)
+    setIsRetakeMode(false)
     setPage('review')
   }
 
-  // 3. When operator selects "Retake" on a specific pose from Review
+  // 3. Single-pose retake requested from ReviewScreen
   const handleRetakePose = (poseIndex) => {
-    setRetakePoseIndex(poseIndex)
+    setTargetPoseIndex(poseIndex)
+    setIsRetakeMode(true)
     setPage('capture')
   }
 
-  // 4. When dataset is confirmed and saved in Review
+  // 4. Single-pose retake captured -> Update activeCaptures and return immediately to review
+  const handleSinglePoseRetakeComplete = (poseName, captureData) => {
+    setActiveCaptures(prev => ({
+      ...prev,
+      [poseName]: captureData,
+    }))
+    setIsRetakeMode(false)
+    setPage('review')
+  }
+
+  // 5. Recapturing an existing student from StudentList detail modal
+  const handleRecaptureStudent = (student, existingPhotos = {}) => {
+    setActiveStudent(student)
+    setActiveCaptures(existingPhotos)
+    setIsRetakeMode(false)
+    setTargetPoseIndex(0)
+    setPage('capture')
+  }
+
+  // 6. Dataset confirmed & saved to IndexedDB
   const handleDatasetSaved = () => {
     setActiveStudent(null)
     setActiveCaptures({})
+    setIsRetakeMode(false)
     setPage('list')
   }
 
@@ -134,9 +157,13 @@ function AppContent() {
         <div
           className="app-header-icon"
           aria-hidden="true"
-          onClick={() => setPage('list')}
+          onClick={() => {
+            setActiveStudent(null)
+            setActiveCaptures({})
+            setPage('list')
+          }}
           style={{ cursor: 'pointer' }}
-          title="Return to Dashboard"
+          title="Return to Student List"
         >
           📸
         </div>
@@ -154,12 +181,10 @@ function AppContent() {
           <StudentList
             onNewStudent={() => {
               setActiveStudent(null)
+              setActiveCaptures({})
               setPage('register')
             }}
-            onSelectStudent={(s) => {
-              setActiveStudent(s)
-              setPage('register')
-            }}
+            onRecaptureStudent={handleRecaptureStudent}
           />
         )}
 
@@ -177,16 +202,18 @@ function AppContent() {
         {page === 'capture' && activeStudent && (
           <CameraCapture
             student={activeStudent}
-            initialPoseIndex={retakePoseIndex}
+            initialPoseIndex={targetPoseIndex}
+            retakeMode={isRetakeMode}
+            existingCaptures={activeCaptures}
             onCancel={() => {
-              // Return to list or review depending on whether we already have captures
-              if (Object.keys(activeCaptures).length === 4) {
+              if (Object.keys(activeCaptures).length === 4 || isRetakeMode) {
                 setPage('review')
               } else {
                 setPage('list')
               }
             }}
             onComplete={handleCaptureComplete}
+            onRetakeComplete={handleSinglePoseRetakeComplete}
           />
         )}
 
@@ -198,6 +225,7 @@ function AppContent() {
             onCancel={() => {
               setActiveStudent(null)
               setActiveCaptures({})
+              setIsRetakeMode(false)
               setPage('list')
             }}
             onSaved={handleDatasetSaved}

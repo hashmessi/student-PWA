@@ -1,60 +1,25 @@
 import { useState } from 'react'
-import { getDb, saveStudent } from '../lib/db'
+import { saveStudentCompleteDataset } from '../lib/db'
 import { useToast } from './ToastContext'
 
-const POSE_LABELS = {
-  front: { title: '1. Front Pose', icon: '👤', angle: '0° Neutral' },
-  left: { title: '2. Left Pose', icon: '👈', angle: '~45° Left' },
-  right: { title: '3. Right Pose', icon: '👉', angle: '~45° Right' },
-  overall: { title: '4. Overall Clear', icon: '✨', angle: 'High Clarity' },
+const POSE_INFO = {
+  front: { title: 'Front Pose', icon: '👤', angle: '0° Neutral', desc: 'Straight-on gaze' },
+  left: { title: 'Left Pose', icon: '👈', angle: '~45° Left', desc: 'Subject turned left' },
+  right: { title: 'Right Pose', icon: '👉', angle: '~45° Right', desc: 'Subject turned right' },
+  overall: { title: 'Overall Clear', icon: '✨', angle: 'Clarity', desc: 'Neutral expression' },
 }
 
 export default function ReviewScreen({ student, captures, onRetakePose, onCancel, onSaved }) {
   const [isSaving, setIsSaving] = useState(false)
+  const [lightboxPose, setLightboxPose] = useState(null)
   const { show } = useToast()
 
   const handleSaveAndConfirm = async () => {
     setIsSaving(true)
     try {
-      const db = await getDb()
-      const tx = db.transaction(['studentMeta', 'photoBlobs'], 'readwrite')
-      const photoStore = tx.objectStore('photoBlobs')
-
-      const poses = ['front', 'left', 'right', 'overall']
-      const imagesMeta = {}
-
-      for (const pose of poses) {
-        const item = captures[pose]
-        if (item && item.blob) {
-          const blobId = `${student.regNo}_${pose}`
-          await photoStore.put({
-            id: blobId,
-            regNo: student.regNo,
-            pose,
-            blob: item.blob,
-            dataUrl: item.dataUrl,
-            width: item.width || 720,
-            height: item.height || 720,
-            capturedAt: item.capturedAt || new Date().toISOString(),
-          })
-          imagesMeta[pose] = `${pose}.jpg`
-        }
-      }
-
-      // Update student metadata to 'complete' status
-      const updatedStudent = {
-        ...student,
-        status: 'complete',
-        capturedAt: new Date().toISOString(),
-        images: imagesMeta,
-        qualityChecksPassed: true,
-      }
-
-      await tx.objectStore('studentMeta').put(updatedStudent)
-      await tx.done
-
-      show(`Dataset for ${student.name} saved successfully!`, 'success')
-      onSaved(updatedStudent)
+      const saved = await saveStudentCompleteDataset(student, captures)
+      show(`Dataset for ${student.name} saved to offline database!`, 'success')
+      onSaved(saved)
     } catch (err) {
       console.error('Error saving captured dataset:', err)
       show('Failed to save dataset to database', 'error')
@@ -64,26 +29,109 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
   }
 
   const poses = ['front', 'left', 'right', 'overall']
+  const capturedCount = poses.filter(p => captures[p]?.dataUrl || captures[p]?.blob).length
 
   return (
     <div className="page" style={{ paddingBottom: 'var(--space-8)' }}>
-      {/* Header */}
+      {/* Lightbox Zoom Modal for 720x720 Inspection */}
+      {lightboxPose && captures[lightboxPose] && (
+        <div
+          className="modal-backdrop"
+          onClick={() => setLightboxPose(null)}
+          role="dialog"
+          aria-modal="true"
+          style={{ padding: 'var(--space-4)', zIndex: 120 }}
+        >
+          <div
+            className="card card--elevated"
+            onClick={e => e.stopPropagation()}
+            style={{
+              maxWidth: '440px',
+              width: '100%',
+              padding: '16px',
+              background: 'var(--bg-surface)',
+              borderColor: 'var(--border-accent)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              animation: 'page-enter 0.2s var(--ease-out) both'
+            }}
+          >
+            <div className="row-between">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>{POSE_INFO[lightboxPose].icon}</span>
+                <strong style={{ fontSize: '0.9375rem' }}>{POSE_INFO[lightboxPose].title}</strong>
+              </div>
+              <button
+                className="btn btn--icon btn--ghost"
+                onClick={() => setLightboxPose(null)}
+                aria-label="Close lightbox"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{
+              width: '100%',
+              aspectRatio: '1 / 1',
+              borderRadius: 'var(--r-md)',
+              overflow: 'hidden',
+              background: '#000',
+              border: '1px solid var(--border-base)',
+            }}>
+              <img
+                src={captures[lightboxPose].dataUrl}
+                alt={`${lightboxPose} full preview`}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+
+            <div className="row-between" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <span>Standard: 720×720 JPEG @ 85%</span>
+              <span className="font-mono">Pose: {POSE_INFO[lightboxPose].angle}</span>
+            </div>
+
+            <div className="row" style={{ gap: '8px', marginTop: '4px' }}>
+              <button
+                className="btn btn--secondary btn--sm btn--full"
+                onClick={() => {
+                  const idx = poses.indexOf(lightboxPose)
+                  setLightboxPose(null)
+                  onRetakePose(idx)
+                }}
+              >
+                ↺ Retake This Pose
+              </button>
+              <button
+                className="btn btn--primary btn--sm btn--full"
+                onClick={() => setLightboxPose(null)}
+              >
+                Looks Good
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Navigation */}
       <div className="row-between" style={{ marginBottom: 'var(--space-4)' }}>
         <button
           id="review-back-btn"
           className="btn btn--ghost btn--sm"
           onClick={onCancel}
         >
-          ✕ Cancel
+          ✕ Discard
         </button>
-        <span className="badge badge--success">4 of 4 Captured</span>
+        <span className="badge badge--success">
+          {capturedCount} of 4 Poses Ready
+        </span>
       </div>
 
       {/* Student Identity Card */}
       <div
         className="card"
         style={{
-          marginBottom: 'var(--space-5)',
+          marginBottom: 'var(--space-4)',
           padding: '14px 16px',
           background: 'var(--bg-surface)',
           borderColor: 'var(--border-accent)',
@@ -93,7 +141,7 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
           <div>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '2px' }}>{student.name}</h2>
             <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-              {student.regNo} · {student.dept} - Section {student.section}
+              {student.regNo} · {student.dept} - Sec {student.section}
             </div>
           </div>
           <span className="badge badge--accent font-mono" style={{ fontSize: '0.7rem' }}>
@@ -103,9 +151,9 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
       </div>
 
       <div style={{ marginBottom: 'var(--space-3)' }}>
-        <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Review Captured Angles</h3>
+        <h3 style={{ fontSize: '0.9375rem', color: 'var(--text-primary)' }}>Review Captured Angles</h3>
         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          Verify clarity across all 4 poses. Tap "Retake" if any angle needs correction.
+          Tap any thumbnail to inspect 720×720 detail. Tap "Retake" to correct any single pose.
         </p>
       </div>
 
@@ -120,7 +168,8 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
       >
         {poses.map((pose, index) => {
           const capture = captures[pose]
-          const labelInfo = POSE_LABELS[pose]
+          const info = POSE_INFO[pose]
+          const score = capture?.qualityScore || {}
 
           return (
             <div
@@ -128,16 +177,17 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
               id={`review-thumbnail-${pose}`}
               className="card"
               style={{
-                padding: '8px',
+                padding: '10px',
                 background: 'var(--bg-elevated)',
-                borderColor: capture ? 'var(--border-subtle)' : 'rgba(239,68,68,0.3)',
+                borderColor: capture ? 'var(--border-subtle)' : 'rgba(239,68,68,0.35)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '8px',
               }}
             >
-              {/* Image Thumbnail Container */}
+              {/* Image Thumbnail with zoom trigger */}
               <div
+                onClick={() => capture && setLightboxPose(pose)}
                 style={{
                   position: 'relative',
                   width: '100%',
@@ -146,18 +196,36 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
                   overflow: 'hidden',
                   background: '#000',
                   border: '1px solid rgba(255,255,255,0.08)',
+                  cursor: capture ? 'pointer' : 'default',
                 }}
+                title="Click to zoom preview"
               >
                 {capture && capture.dataUrl ? (
-                  <img
-                    src={capture.dataUrl}
-                    alt={`${pose} capture`}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                  />
+                  <>
+                    <img
+                      src={capture.dataUrl}
+                      alt={`${pose} capture`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: '6px',
+                        right: '6px',
+                        padding: '2px 5px',
+                        borderRadius: 'var(--r-sm)',
+                        background: 'rgba(0,0,0,0.65)',
+                        color: '#fff',
+                        fontSize: '10px',
+                      }}
+                    >
+                      🔍 Zoom
+                    </div>
+                  </>
                 ) : (
                   <div
                     style={{
@@ -182,21 +250,38 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
                     left: '6px',
                     padding: '2px 6px',
                     borderRadius: 'var(--r-sm)',
-                    background: 'rgba(7, 7, 12, 0.85)',
+                    background: 'rgba(7, 7, 12, 0.88)',
                     backdropFilter: 'blur(6px)',
                     color: 'var(--text-primary)',
                     fontSize: '0.6875rem',
                     fontWeight: 700,
                   }}
                 >
-                  {labelInfo.icon} {labelInfo.title.split(' ')[1]}
+                  {info.icon} {info.title.split(' ')[0]}
                 </div>
               </div>
 
-              {/* Angle Description & Retake Action */}
+              {/* Quality score pills */}
+              {score.sharpness !== undefined && (
+                <div
+                  className="row"
+                  style={{
+                    gap: '4px',
+                    fontSize: '10px',
+                    color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-mono)'
+                  }}
+                >
+                  <span title="Sharpness score">✨ {score.sharpness}</span>
+                  <span>•</span>
+                  <span title="Yaw angle">📐 {score.yaw}°</span>
+                </div>
+              )}
+
+              {/* Angle Label & Retake Action */}
               <div className="row-between" style={{ padding: '0 2px' }}>
                 <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  {labelInfo.angle}
+                  {info.angle}
                 </span>
                 <button
                   id={`retake-btn-${pose}`}
@@ -224,9 +309,9 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
           type="button"
           className="btn btn--primary btn--full btn--lg"
           onClick={handleSaveAndConfirm}
-          disabled={isSaving}
+          disabled={isSaving || capturedCount < 4}
         >
-          {isSaving ? 'Saving to Database…' : '✓ Confirm & Save Student Dataset'}
+          {isSaving ? 'Saving Dataset to IndexedDB…' : '✓ Confirm & Save Student Dataset'}
         </button>
         <button
           id="review-cancel-btn"
@@ -234,7 +319,7 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
           className="btn btn--ghost btn--full btn--sm"
           onClick={onCancel}
         >
-          Discard & Return to Student List
+          Cancel & Return to Dashboard
         </button>
       </div>
     </div>

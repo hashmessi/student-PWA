@@ -19,7 +19,8 @@ export function getDb() {
 
         // Photo blobs store — keyed by "regNo_pose" (e.g. "21IT001_front")
         if (!db.objectStoreNames.contains('photoBlobs')) {
-          db.createObjectStore('photoBlobs', { keyPath: 'id' })
+          const photoStore = db.createObjectStore('photoBlobs', { keyPath: 'id' })
+          photoStore.createIndex('regNo', 'regNo', { unique: false })
         }
       },
     })
@@ -45,7 +46,7 @@ export async function checkRegNo(regNo) {
 }
 
 /**
- * Save or update a student record.
+ * Save or update student metadata record.
  * status: 'pending' | 'in-progress' | 'complete'
  */
 export async function saveStudent(studentData) {
@@ -58,6 +59,90 @@ export async function saveStudent(studentData) {
   }
   await db.put('studentMeta', record)
   return record
+}
+
+/**
+ * Atomically saves both the student metadata and all 4 photo blobs in a single transaction.
+ * @param {object} studentData 
+ * @param {object} capturesMap { front, left, right, overall }
+ */
+export async function saveStudentCompleteDataset(studentData, capturesMap) {
+  const db = await getDb()
+  const tx = db.transaction(['studentMeta', 'photoBlobs'], 'readwrite')
+  const metaStore = tx.objectStore('studentMeta')
+  const photoStore = tx.objectStore('photoBlobs')
+
+  const regNo = studentData.regNo.toUpperCase()
+  const poses = ['front', 'left', 'right', 'overall']
+  const imagesMeta = {}
+
+  for (const pose of poses) {
+    const item = capturesMap[pose]
+    if (item && item.blob) {
+      const blobId = `${regNo}_${pose}`
+      await photoStore.put({
+        id: blobId,
+        regNo,
+        pose,
+        blob: item.blob,
+        dataUrl: item.dataUrl || null,
+        width: item.width || 720,
+        height: item.height || 720,
+        qualityScore: item.qualityScore || {},
+        capturedAt: item.capturedAt || new Date().toISOString(),
+      })
+      imagesMeta[pose] = `${pose}.jpg`
+    }
+  }
+
+  const updatedRecord = {
+    ...studentData,
+    regNo,
+    status: 'complete',
+    capturedAt: new Date().toISOString(),
+    images: imagesMeta,
+    qualityChecksPassed: true,
+  }
+
+  await metaStore.put(updatedRecord)
+  await tx.done
+
+  return updatedRecord
+}
+
+/**
+ * Retrieves all 4 photos for a given student from photoBlobs store.
+ * Returns map: { front: { blob, dataUrl, ... }, left: ..., right: ..., overall: ... }
+ * @param {string} regNo 
+ */
+export async function getStudentPhotos(regNo) {
+  if (!regNo) return {}
+  const normalizedRegNo = regNo.toUpperCase()
+  const db = await getDb()
+  const tx = db.transaction('photoBlobs', 'readonly')
+  const store = tx.objectStore('photoBlobs')
+
+  const poses = ['front', 'left', 'right', 'overall']
+  const result = {}
+
+  for (const pose of poses) {
+    const key = `${normalizedRegNo}_${pose}`
+    const record = await store.get(key)
+    if (record) {
+      // Ensure dataUrl is available (create from Blob if needed)
+      let dataUrl = record.dataUrl
+      if (!dataUrl && record.blob) {
+        dataUrl = URL.createObjectURL(record.blob)
+      }
+      result[pose] = {
+        ...record,
+        dataUrl,
+      }
+    }
+  }
+
+  await tx.done
+  return result
 }
 
 /**
@@ -93,4 +178,21 @@ export async function deleteStudent(regNo) {
     await tx.objectStore('photoBlobs').delete(`${normalizedRegNo}_${pose}`)
   }
   await tx.done
+}
+
+/**
+ * Returns database metrics and photo storage counts.
+ */
+export async function getDatabaseStats() {
+  const db = await getDb()
+  const allStudents = await db.getAll('studentMeta')
+  const completeCount = allStudents.filter(s => s.status === 'complete').length
+  const photoKeys = await db.getAllKeys('photoBlobs')
+
+  return {
+    totalStudents: allStudents.length,
+    completeDatasets: completeCount,
+    pendingDatasets: allStudents.length - completeCount,
+    totalPhotos: photoKeys.length,
+  }
 }

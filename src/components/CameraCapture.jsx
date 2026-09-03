@@ -7,16 +7,24 @@ import { useToast } from './ToastContext'
 
 const POSE_SEQUENCE = ['front', 'left', 'right', 'overall']
 
-export default function CameraCapture({ student, initialPoseIndex = 0, onCancel, onComplete }) {
+export default function CameraCapture({
+  student,
+  initialPoseIndex = 0,
+  retakeMode = false,
+  existingCaptures = {},
+  onCancel,
+  onComplete,
+  onRetakeComplete,
+}) {
   const [currentStepIndex, setCurrentStepIndex] = useState(initialPoseIndex)
-  const [capturedImages, setCapturedImages] = useState({}) // { front, left, right, overall }
+  const [capturedImages, setCapturedImages] = useState(existingCaptures)
   const [modelsReady, setModelsReady] = useState(false)
   const [modelsError, setModelsError] = useState(null)
   const [cameraError, setCameraError] = useState(null)
   const [qualityResult, setQualityResult] = useState(null)
-  const [holdProgress, setHoldProgress] = useState(0) // 0 to 1
+  const [holdProgress, setHoldProgress] = useState(0)
   const [isCapturing, setIsCapturing] = useState(false)
-  const [facingMode, setFacingMode] = useState('user') // 'user' | 'environment'
+  const [facingMode, setFacingMode] = useState('user')
   const [autoCaptureEnabled, setAutoCaptureEnabled] = useState(true)
 
   const videoRef = useRef(null)
@@ -108,11 +116,20 @@ export default function CameraCapture({ student, initialPoseIndex = 0, onCancel,
 
       setCapturedImages(updatedCaptures)
 
-      // Audio / Haptic feedback
       if (navigator.vibrate) navigator.vibrate(50)
       show(`Captured ${currentPose.toUpperCase()} pose!`, 'success', 2000)
 
-      // Advance to next step or complete
+      // If in single-pose retake mode, return immediately to Review with the updated pose
+      if (retakeMode && onRetakeComplete) {
+        setTimeout(() => {
+          setIsCapturing(false)
+          isCapturingRef.current = false
+          onRetakeComplete(currentPose, captureRecord)
+        }, 400)
+        return
+      }
+
+      // Standard sequential flow
       if (currentStepIndex < POSE_SEQUENCE.length - 1) {
         setTimeout(() => {
           setCurrentStepIndex(prev => prev + 1)
@@ -134,15 +151,15 @@ export default function CameraCapture({ student, initialPoseIndex = 0, onCancel,
       setIsCapturing(false)
       isCapturingRef.current = false
     }
-  }, [currentPose, currentStepIndex, capturedImages, student, onComplete, show])
+  }, [currentPose, currentStepIndex, capturedImages, student, retakeMode, onRetakeComplete, onComplete, show])
 
   // 4. Real-time Detection & Quality Evaluation Loop
   useEffect(() => {
     if (!modelsReady || cameraError) return
 
     let lastEvalTime = 0
-    const evalInterval = 80 // evaluate every ~80ms (~12fps evaluation for low CPU)
-    const REQUIRED_HOLD_MS = 900 // Hold still for 900ms for auto-capture
+    const evalInterval = 80
+    const REQUIRED_HOLD_MS = 900
 
     const checkFrame = async (timestamp) => {
       if (videoRef.current && videoRef.current.readyState >= 2 && !isCapturingRef.current) {
@@ -198,7 +215,7 @@ export default function CameraCapture({ student, initialPoseIndex = 0, onCancel,
           className="btn btn--ghost btn--sm"
           onClick={onCancel}
         >
-          ✕ Cancel
+          ✕ {retakeMode ? 'Cancel Retake' : 'Cancel'}
         </button>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -246,7 +263,7 @@ export default function CameraCapture({ student, initialPoseIndex = 0, onCancel,
           }}
         />
 
-        {/* Quality Overlays (Oval + Box + Feedback Badge + Shutter Flash) */}
+        {/* Quality Overlays */}
         {modelsReady && !cameraError && (
           <QualityOverlay
             qualityResult={qualityResult}
@@ -256,7 +273,7 @@ export default function CameraCapture({ student, initialPoseIndex = 0, onCancel,
           />
         )}
 
-        {/* Neural Model Loader Overlay */}
+        {/* Model Loader */}
         {!modelsReady && !modelsError && (
           <div style={{
             position: 'absolute',
@@ -275,7 +292,7 @@ export default function CameraCapture({ student, initialPoseIndex = 0, onCancel,
           </div>
         )}
 
-        {/* Camera Permission / Access Error */}
+        {/* Camera Permission Error */}
         {cameraError && (
           <div style={{
             position: 'absolute',

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getAllStudents, deleteStudent } from '../lib/db'
 import { useToast } from './ToastContext'
+import StudentDetailModal from './StudentDetailModal'
 
 function EmptyState({ onNewStudent }) {
   return (
@@ -51,75 +52,6 @@ function EmptyState({ onNewStudent }) {
   )
 }
 
-function DeleteConfirmDialog({ student, onConfirm, onCancel }) {
-  return (
-    <div
-      className="modal-backdrop"
-      role="alertdialog"
-      aria-labelledby="delete-confirm-title"
-      aria-modal="true"
-    >
-      <div className="modal-sheet">
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-          <div style={{
-            width: '52px',
-            height: '52px',
-            borderRadius: '50%',
-            background: 'var(--danger-subtle)',
-            border: '1px solid rgba(239,68,68,0.35)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '24px'
-          }}>
-            🗑️
-          </div>
-        </div>
-
-        <h3 id="delete-confirm-title" style={{ textAlign: 'center', marginBottom: 'var(--space-2)', fontSize: '1.15rem' }}>
-          Delete Student Dataset?
-        </h3>
-
-        <p style={{ fontSize: '0.875rem', textAlign: 'center', marginBottom: 'var(--space-4)', color: 'var(--text-secondary)' }}>
-          Are you sure you want to delete <strong style={{ color: 'var(--text-primary)' }}>{student.name}</strong> (<span className="font-mono" style={{ color: 'var(--accent-hover)' }}>{student.regNo}</span>)?
-        </p>
-
-        <div
-          style={{
-            fontSize: '0.8rem',
-            color: '#fca5a5',
-            marginBottom: 'var(--space-6)',
-            padding: '12px 14px',
-            background: 'var(--danger-subtle)',
-            border: '1px solid rgba(239,68,68,0.25)',
-            borderRadius: 'var(--r-md)',
-            lineHeight: '1.45'
-          }}
-        >
-          ⚠ This permanently removes the student record and all 4 associated face photos from IndexedDB.
-        </div>
-
-        <div className="stack-2">
-          <button
-            id="delete-confirm-btn"
-            className="btn btn--danger btn--full btn--lg"
-            onClick={onConfirm}
-          >
-            Yes, Permanently Delete
-          </button>
-          <button
-            id="delete-cancel-btn"
-            className="btn btn--ghost btn--full btn--sm"
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function getInitials(name) {
   if (!name) return '??'
   return name
@@ -137,10 +69,13 @@ function StatusBadge({ status }) {
   return <span className="badge badge--muted">○ Pending</span>
 }
 
-export default function StudentList({ onNewStudent, onSelectStudent }) {
+export default function StudentList({
+  onNewStudent,
+  onRecaptureStudent,
+}) {
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
-  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [selectedStudentForDetail, setSelectedStudentForDetail] = useState(null)
   const [filter, setFilter] = useState('all') // 'all' | 'complete' | 'pending'
   const [searchQuery, setSearchQuery] = useState('')
   const { show } = useToast()
@@ -162,29 +97,13 @@ export default function StudentList({ onNewStudent, onSelectStudent }) {
     loadStudents()
   }, [loadStudents])
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    try {
-      await deleteStudent(deleteTarget.regNo)
-      setStudents(prev => prev.filter(s => s.regNo !== deleteTarget.regNo))
-      show(`Deleted ${deleteTarget.name} (${deleteTarget.regNo})`, 'success')
-    } catch (err) {
-      console.error('Failed to delete student:', err)
-      show('Failed to delete record', 'error')
-    } finally {
-      setDeleteTarget(null)
-    }
-  }
-
   const completeCount = students.filter(s => s.status === 'complete').length
   const pendingCount = students.length - completeCount
 
   const filtered = students.filter(s => {
-    // Status filter
     if (filter === 'complete' && s.status !== 'complete') return false
     if (filter === 'pending' && s.status === 'complete') return false
 
-    // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim()
       const matchName = s.name.toLowerCase().includes(q)
@@ -208,11 +127,18 @@ export default function StudentList({ onNewStudent, onSelectStudent }) {
 
   return (
     <>
-      {deleteTarget && (
-        <DeleteConfirmDialog
-          student={deleteTarget}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
+      {/* Student Dataset Inspector Modal */}
+      {selectedStudentForDetail && (
+        <StudentDetailModal
+          student={selectedStudentForDetail}
+          onClose={() => setSelectedStudentForDetail(null)}
+          onRecapture={(student, existingPhotos) => {
+            setSelectedStudentForDetail(null)
+            onRecaptureStudent(student, existingPhotos)
+          }}
+          onDeleted={(deletedRegNo) => {
+            setStudents(prev => prev.filter(s => s.regNo !== deletedRegNo))
+          }}
         />
       )}
 
@@ -312,8 +238,8 @@ export default function StudentList({ onNewStudent, onSelectStudent }) {
                     className="student-item"
                     role="button"
                     tabIndex={0}
-                    onClick={() => onSelectStudent(student)}
-                    onKeyDown={e => e.key === 'Enter' && onSelectStudent(student)}
+                    onClick={() => setSelectedStudentForDetail(student)}
+                    onKeyDown={e => e.key === 'Enter' && setSelectedStudentForDetail(student)}
                   >
                     {/* Initials Avatar */}
                     <div className="student-avatar" aria-hidden="true">
@@ -347,22 +273,10 @@ export default function StudentList({ onNewStudent, onSelectStudent }) {
                       </div>
                     </div>
 
-                    {/* Status Badge & Actions */}
+                    {/* Status Badge */}
                     <div className="row" style={{ gap: 'var(--space-2)', flexShrink: 0 }}>
                       <StatusBadge status={student.status} />
-                      <button
-                        id={`delete-btn-${student.regNo}`}
-                        className="btn btn--icon btn--ghost"
-                        aria-label={`Delete record for ${student.name}`}
-                        onClick={e => {
-                          e.stopPropagation()
-                          setDeleteTarget(student)
-                        }}
-                        style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}
-                        title="Delete Student Record"
-                      >
-                        🗑
-                      </button>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>›</span>
                     </div>
                   </div>
                 ))
