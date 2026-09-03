@@ -23,9 +23,13 @@ export function calculateBrightness(imageData) {
   return totalLuminance / pixelCount
 }
 
+// Reusable singleton patch canvas for zero-allocation sharpness calculation
+let sharedPatchCanvas = null
+let sharedPatchCtx = null
+
 /**
  * Calculates sharpness score using variance of Laplacian on a grayscale patch.
- * Higher score = sharper image; lower score (< 35) = blurry / out of focus.
+ * Zero-allocation high-performance implementation.
  * @param {HTMLCanvasElement} canvas 
  * @param {CanvasRenderingContext2D} ctx 
  * @param {{ x: number, y: number, width: number, height: number }} box 
@@ -40,40 +44,44 @@ export function calculateSharpness(canvas, ctx, box) {
 
   if (sw <= 10 || sh <= 10) return 0
 
-  // Downsample patch to max 120x120 for fast real-time compute
-  const targetW = Math.min(120, sw)
-  const targetH = Math.min(120, sh)
+  // Downsample patch to max 100x100 for high-speed compute
+  const targetW = Math.min(100, sw)
+  const targetH = Math.min(100, sh)
 
-  const patchCanvas = document.createElement('canvas')
-  patchCanvas.width = targetW
-  patchCanvas.height = targetH
-  const patchCtx = patchCanvas.getContext('2d', { willReadFrequently: true })
-  
-  patchCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, targetW, targetH)
-  const imgData = patchCtx.getImageData(0, 0, targetW, targetH)
-  const pixels = imgData.data
-
-  // Convert to grayscale
-  const gray = new Float32Array(targetW * targetH)
-  for (let i = 0, j = 0; i < pixels.length; i += 4, j++) {
-    gray[j] = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]
+  if (!sharedPatchCanvas) {
+    sharedPatchCanvas = document.createElement('canvas')
+    sharedPatchCanvas.width = 100
+    sharedPatchCanvas.height = 100
+    sharedPatchCtx = sharedPatchCanvas.getContext('2d', { willReadFrequently: true })
   }
 
-  // Laplacian 3x3 kernel: [0, 1, 0; 1, -4, 1; 0, 1, 0]
+  sharedPatchCtx.clearRect(0, 0, 100, 100)
+  sharedPatchCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, targetW, targetH)
+  const imgData = sharedPatchCtx.getImageData(0, 0, targetW, targetH)
+  const pixels = imgData.data
+
   let laplacianSum = 0
   let laplacianSqSum = 0
   let count = 0
 
   for (let y = 1; y < targetH - 1; y++) {
     for (let x = 1; x < targetW - 1; x++) {
-      const idx = y * targetW + x
-      const lap =
-        gray[idx - targetW] +
-        gray[idx - 1] +
-        gray[idx + 1] +
-        gray[idx + targetW] -
-        4 * gray[idx]
+      const idx = (y * targetW + x) * 4
+      const center = 0.299 * pixels[idx] + 0.587 * pixels[idx + 1] + 0.114 * pixels[idx + 2]
 
+      const topIdx = ((y - 1) * targetW + x) * 4
+      const top = 0.299 * pixels[topIdx] + 0.587 * pixels[topIdx + 1] + 0.114 * pixels[topIdx + 2]
+
+      const botIdx = ((y + 1) * targetW + x) * 4
+      const bot = 0.299 * pixels[botIdx] + 0.587 * pixels[botIdx + 1] + 0.114 * pixels[botIdx + 2]
+
+      const leftIdx = (y * targetW + (x - 1)) * 4
+      const left = 0.299 * pixels[leftIdx] + 0.587 * pixels[leftIdx + 1] + 0.114 * pixels[leftIdx + 2]
+
+      const rightIdx = (y * targetW + (x + 1)) * 4
+      const right = 0.299 * pixels[rightIdx] + 0.587 * pixels[rightIdx + 1] + 0.114 * pixels[rightIdx + 2]
+
+      const lap = top + bot + left + right - 4 * center
       laplacianSum += lap
       laplacianSqSum += lap * lap
       count++

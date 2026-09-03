@@ -199,6 +199,7 @@ export async function getDatabaseStats() {
 
 /**
  * Creates a synthetic 720x720 biometric canvas image blob for demo purposes.
+ * Styled as clinical blueprint on paper per DESIGN.md.
  */
 function createDemoFaceBlob(name, regNo, poseTitle, yawDirection = 0) {
   return new Promise((resolve) => {
@@ -207,15 +208,12 @@ function createDemoFaceBlob(name, regNo, poseTitle, yawDirection = 0) {
     canvas.height = 720
     const ctx = canvas.getContext('2d')
 
-    // Background gradient
-    const bgGrad = ctx.createLinearGradient(0, 0, 720, 720)
-    bgGrad.addColorStop(0, '#0f172a')
-    bgGrad.addColorStop(1, '#1e1b4b')
-    ctx.fillStyle = bgGrad
+    // Background paper
+    ctx.fillStyle = '#fafafa'
     ctx.fillRect(0, 0, 720, 720)
 
-    // Biometric Grid lines
-    ctx.strokeStyle = 'rgba(99, 102, 241, 0.12)'
+    // Blueprint grid lines
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.06)'
     ctx.lineWidth = 1
     for (let x = 40; x < 720; x += 40) {
       ctx.beginPath()
@@ -231,37 +229,37 @@ function createDemoFaceBlob(name, regNo, poseTitle, yawDirection = 0) {
     }
 
     // Oval Guide Outline
-    ctx.strokeStyle = 'rgba(34, 211, 160, 0.35)'
-    ctx.lineWidth = 2
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.25)'
+    ctx.lineWidth = 1.5
     ctx.beginPath()
     ctx.ellipse(360, 340, 160, 220, 0, 0, 2 * Math.PI)
     ctx.stroke()
 
     // Face Silhouette
     const offsetX = yawDirection * 45
-    ctx.fillStyle = 'rgba(129, 140, 248, 0.22)'
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.05)'
     ctx.beginPath()
     ctx.ellipse(360 + offsetX, 340, 145, 195, 0, 0, 2 * Math.PI)
     ctx.fill()
 
-    // Biometric Features (Eyes, Nose, Mouth)
-    ctx.fillStyle = '#f8fafc'
+    // Biometric Features (Eyes, Nose, Mouth) in Ink
+    ctx.fillStyle = '#0a0a0a'
     // Eyes
     ctx.beginPath()
-    ctx.arc(315 + offsetX, 310, 12, 0, 2 * Math.PI)
-    ctx.arc(405 + offsetX, 310, 12, 0, 2 * Math.PI)
+    ctx.arc(315 + offsetX, 310, 8, 0, 2 * Math.PI)
+    ctx.arc(405 + offsetX, 310, 8, 0, 2 * Math.PI)
     ctx.fill()
 
     // Pupils
-    ctx.fillStyle = '#6366f1'
+    ctx.fillStyle = '#171717'
     ctx.beginPath()
-    ctx.arc(315 + offsetX + (yawDirection * 3), 310, 5, 0, 2 * Math.PI)
-    ctx.arc(405 + offsetX + (yawDirection * 3), 310, 5, 0, 2 * Math.PI)
+    ctx.arc(315 + offsetX + (yawDirection * 3), 310, 4, 0, 2 * Math.PI)
+    ctx.arc(405 + offsetX + (yawDirection * 3), 310, 4, 0, 2 * Math.PI)
     ctx.fill()
 
     // Nose bridge
-    ctx.strokeStyle = '#94a3b8'
-    ctx.lineWidth = 3
+    ctx.strokeStyle = '#404040'
+    ctx.lineWidth = 2
     ctx.beginPath()
     ctx.moveTo(360 + offsetX, 320)
     ctx.lineTo(360 + offsetX + (yawDirection * 8), 365)
@@ -269,29 +267,31 @@ function createDemoFaceBlob(name, regNo, poseTitle, yawDirection = 0) {
     ctx.stroke()
 
     // Mouth
+    ctx.strokeStyle = '#0a0a0a'
+    ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.arc(360 + offsetX, 415, 24, 0.1 * Math.PI, 0.9 * Math.PI)
+    ctx.arc(360 + offsetX, 415, 22, 0.1 * Math.PI, 0.9 * Math.PI)
     ctx.stroke()
 
     // Target Crosshairs
-    ctx.strokeStyle = '#22d3a0'
-    ctx.lineWidth = 2
+    ctx.strokeStyle = '#171717'
+    ctx.lineWidth = 1.5
     ctx.beginPath()
     ctx.moveTo(350, 340); ctx.lineTo(370, 340)
     ctx.moveTo(360, 330); ctx.lineTo(360, 350)
     ctx.stroke()
 
     // Technical Watermark Header & Footer
-    ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 22px Inter, sans-serif'
+    ctx.fillStyle = '#0a0a0a'
+    ctx.font = '600 20px "Geist", "Inter", sans-serif'
     ctx.fillText(`${name} (${regNo})`, 36, 56)
 
-    ctx.font = '600 16px "JetBrains Mono", monospace'
-    ctx.fillStyle = '#22d3a0'
-    ctx.fillText(`BIOMETRIC POSE: ${poseTitle.toUpperCase()}`, 36, 84)
+    ctx.font = '600 13px "Geist Mono", monospace'
+    ctx.fillStyle = '#16a34a'
+    ctx.fillText(`BIOMETRIC POSE: ${poseTitle.toUpperCase()}`, 36, 82)
 
-    ctx.fillStyle = '#94a3b8'
-    ctx.font = '14px "JetBrains Mono", monospace'
+    ctx.fillStyle = '#737373'
+    ctx.font = '12px "Geist Mono", monospace'
     ctx.fillText('STANDARDIZED: 720×720 @ 85% · YAW ESTIMATION PASSED', 36, 680)
 
     canvas.toBlob((blob) => {
@@ -307,28 +307,28 @@ function createDemoFaceBlob(name, regNo, poseTitle, yawDirection = 0) {
 export async function seedDemoStudents() {
   const demoList = [
     {
-      regNo: '21IT001',
+      regNo: '310625205065',
+      name: 'Dhanush',
+      dept: 'IT',
+      section: 'A',
+      email: '310625205065@eec.srmrmp.edu.in',
+      status: 'complete',
+    },
+    {
+      regNo: '310625205100',
+      name: 'Hashvanth M U',
+      dept: 'IT',
+      section: 'B',
+      email: '310625205100@eec.srmrmp.edu.in',
+      status: 'complete',
+    },
+    {
+      regNo: '310625205001',
       name: 'Aarav Sharma',
       dept: 'IT',
       section: 'A',
-      email: 'aarav.sharma@college.edu',
-      status: 'complete',
-    },
-    {
-      regNo: '21IT002',
-      name: 'Ananya Rao',
-      dept: 'IT',
-      section: 'B',
-      email: 'ananya.rao@college.edu',
+      email: '310625205001@eec.srmrmp.edu.in',
       status: 'pending',
-    },
-    {
-      regNo: '21IT003',
-      name: 'Rohan Varma',
-      dept: 'IT',
-      section: 'A',
-      email: 'rohan.varma@college.edu',
-      status: 'complete',
     },
   ]
 

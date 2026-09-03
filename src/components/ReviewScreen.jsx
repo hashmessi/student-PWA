@@ -3,10 +3,10 @@ import { saveStudentCompleteDataset } from '../lib/db'
 import { useToast } from './ToastContext'
 
 const POSE_INFO = {
-  front: { title: 'Front Pose', icon: '👤', angle: '0° Neutral', desc: 'Straight-on gaze' },
-  left: { title: 'Left Pose', icon: '👈', angle: '~45° Left', desc: 'Subject turned left' },
-  right: { title: 'Right Pose', icon: '👉', angle: '~45° Right', desc: 'Subject turned right' },
-  overall: { title: 'Overall Clear', icon: '✨', angle: 'Clarity', desc: 'Neutral expression' },
+  front: { title: 'Front Pose', icon: '👤', angle: '0° Gaze', desc: 'Straight-on gaze' },
+  left: { title: 'Left Profile', icon: '👈', angle: 'Left Cheek', desc: 'Left profile exposed' },
+  right: { title: 'Right Profile', icon: '👉', angle: 'Right Cheek', desc: 'Right profile exposed' },
+  overall: { title: 'Overall Clarity', icon: '✨', angle: '720×720', desc: 'Neutral expression' },
 }
 
 export default function ReviewScreen({ student, captures, onRetakePose, onCancel, onSaved }) {
@@ -43,24 +43,21 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
           style={{ padding: 'var(--space-4)', zIndex: 120 }}
         >
           <div
-            className="card card--elevated"
+            className="card"
             onClick={e => e.stopPropagation()}
             style={{
               maxWidth: '440px',
               width: '100%',
               padding: '16px',
-              background: 'var(--bg-surface)',
-              borderColor: 'var(--border-accent)',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              animation: 'page-enter 0.2s var(--ease-out) both'
             }}
           >
             <div className="row-between">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span>{POSE_INFO[lightboxPose].icon}</span>
-                <strong style={{ fontSize: '0.9375rem' }}>{POSE_INFO[lightboxPose].title}</strong>
+                <strong style={{ fontSize: '14px', color: 'var(--color-ink)' }}>{POSE_INFO[lightboxPose].title}</strong>
               </div>
               <button
                 className="btn btn--icon btn--ghost"
@@ -74,10 +71,10 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
             <div style={{
               width: '100%',
               aspectRatio: '1 / 1',
-              borderRadius: 'var(--r-md)',
+              borderRadius: 'var(--r-nested)',
               overflow: 'hidden',
               background: '#000',
-              border: '1px solid var(--border-base)',
+              border: '1px solid var(--color-hairline)',
             }}>
               <img
                 src={captures[lightboxPose].dataUrl}
@@ -86,9 +83,9 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
               />
             </div>
 
-            <div className="row-between" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <div className="row-between" style={{ fontSize: '12px', color: 'var(--color-mid-gray)' }}>
               <span>Standard: 720×720 JPEG @ 85%</span>
-              <span className="font-mono">Pose: {POSE_INFO[lightboxPose].angle}</span>
+              <span className="font-mono">{POSE_INFO[lightboxPose].angle}</span>
             </div>
 
             <div className="row" style={{ gap: '8px', marginTop: '4px' }}>
@@ -100,7 +97,7 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
                   onRetakePose(idx)
                 }}
               >
-                ↺ Retake This Pose
+                ↺ Retake Pose
               </button>
               <button
                 className="btn btn--primary btn--sm btn--full"
@@ -120,7 +117,7 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
           className="btn btn--ghost btn--sm"
           onClick={onCancel}
         >
-          ✕ Discard
+          ← Discard
         </button>
         <span className="badge badge--success">
           {capturedCount} of 4 Poses Ready
@@ -132,28 +129,26 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
         className="card"
         style={{
           marginBottom: 'var(--space-4)',
-          padding: '14px 16px',
-          background: 'var(--bg-surface)',
-          borderColor: 'var(--border-accent)',
+          padding: '14px 18px',
         }}
       >
         <div className="row-between">
           <div>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '2px' }}>{student.name}</h2>
-            <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--color-mid-gray)', fontFamily: 'var(--font-mono)' }}>
               {student.regNo} · {student.dept} - Sec {student.section}
             </div>
           </div>
-          <span className="badge badge--accent font-mono" style={{ fontSize: '0.7rem' }}>
+          <span className="badge badge--muted font-mono">
             720×720 JPG
           </span>
         </div>
       </div>
 
       <div style={{ marginBottom: 'var(--space-3)' }}>
-        <h3 style={{ fontSize: '0.9375rem', color: 'var(--text-primary)' }}>Review Captured Angles</h3>
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          Tap any thumbnail to inspect 720×720 detail. Tap "Retake" to correct any single pose.
+        <h3 style={{ fontSize: '14px', color: 'var(--color-ink)' }}>Review Captured Poses</h3>
+        <p style={{ fontSize: '12px', color: 'var(--color-mid-gray)' }}>
+          Click any thumbnail to inspect 720×720 detail. Click "Retake" to correct any single angle.
         </p>
       </div>
 
@@ -178,8 +173,7 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
               className="card"
               style={{
                 padding: '10px',
-                background: 'var(--bg-elevated)',
-                borderColor: capture ? 'var(--border-subtle)' : 'rgba(239,68,68,0.35)',
+                borderColor: capture ? 'var(--color-hairline)' : 'var(--danger-border)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '8px',
@@ -192,10 +186,10 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
                   position: 'relative',
                   width: '100%',
                   aspectRatio: '1 / 1',
-                  borderRadius: 'var(--r-md)',
+                  borderRadius: 'var(--r-nested)',
                   overflow: 'hidden',
                   background: '#000',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  border: '1px solid var(--color-hairline)',
                   cursor: capture ? 'pointer' : 'default',
                 }}
                 title="Click to zoom preview"
@@ -216,14 +210,15 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
                         position: 'absolute',
                         bottom: '6px',
                         right: '6px',
-                        padding: '2px 5px',
+                        padding: '2px 6px',
                         borderRadius: 'var(--r-sm)',
-                        background: 'rgba(0,0,0,0.65)',
+                        background: 'rgba(0,0,0,0.7)',
                         color: '#fff',
                         fontSize: '10px',
+                        fontWeight: 500,
                       }}
                     >
-                      🔍 Zoom
+                      🔍 720p
                     </div>
                   </>
                 ) : (
@@ -234,8 +229,8 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: 'var(--danger)',
-                      fontSize: '0.75rem',
+                      color: 'var(--color-ember)',
+                      fontSize: '12px',
                     }}
                   >
                     Missing
@@ -250,11 +245,10 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
                     left: '6px',
                     padding: '2px 6px',
                     borderRadius: 'var(--r-sm)',
-                    background: 'rgba(7, 7, 12, 0.88)',
-                    backdropFilter: 'blur(6px)',
-                    color: 'var(--text-primary)',
-                    fontSize: '0.6875rem',
-                    fontWeight: 700,
+                    background: 'rgba(10, 10, 10, 0.85)',
+                    color: '#ffffff',
+                    fontSize: '11px',
+                    fontWeight: 500,
                   }}
                 >
                   {info.icon} {info.title.split(' ')[0]}
@@ -268,7 +262,7 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
                   style={{
                     gap: '4px',
                     fontSize: '10px',
-                    color: 'var(--text-muted)',
+                    color: 'var(--color-mid-gray)',
                     fontFamily: 'var(--font-mono)'
                   }}
                 >
@@ -280,7 +274,7 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
 
               {/* Angle Label & Retake Action */}
               <div className="row-between" style={{ padding: '0 2px' }}>
-                <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-mid-gray)', fontFamily: 'var(--font-mono)' }}>
                   {info.angle}
                 </span>
                 <button
@@ -289,9 +283,10 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
                   className="btn btn--ghost btn--sm"
                   onClick={() => onRetakePose(index)}
                   style={{
-                    fontSize: '0.75rem',
+                    fontSize: '12px',
                     padding: '2px 8px',
-                    color: 'var(--accent-hover)',
+                    minHeight: '26px',
+                    color: 'var(--color-ink)',
                   }}
                 >
                   ↺ Retake
@@ -311,7 +306,7 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
           onClick={handleSaveAndConfirm}
           disabled={isSaving || capturedCount < 4}
         >
-          {isSaving ? 'Saving Dataset to IndexedDB…' : '✓ Confirm & Save Student Dataset'}
+          {isSaving ? 'Saving Dataset to Database…' : '✓ Confirm & Save Student Dataset'}
         </button>
         <button
           id="review-cancel-btn"
@@ -319,7 +314,7 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
           className="btn btn--ghost btn--full btn--sm"
           onClick={onCancel}
         >
-          Cancel & Return to Dashboard
+          Cancel & Return to Roster
         </button>
       </div>
     </div>

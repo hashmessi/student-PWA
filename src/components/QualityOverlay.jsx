@@ -5,16 +5,30 @@ export default function QualityOverlay({
   expectedPose,
   holdProgress, // 0 to 1
   isCapturing,
+  videoRef,
+  facingMode = 'user',
 }) {
   const canvasRef = useRef(null)
 
   const isReady = qualityResult && qualityResult.passed
   const reason = qualityResult ? qualityResult.reason : 'Align face with the oval guide'
+  const currentYaw = qualityResult?.score?.yaw
 
   // Draw landmarks & bounding box
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+
+    // Sync canvas internal resolution with actual video stream resolution
+    if (videoRef?.current && videoRef.current.videoWidth > 0) {
+      if (canvas.width !== videoRef.current.videoWidth) {
+        canvas.width = videoRef.current.videoWidth
+      }
+      if (canvas.height !== videoRef.current.videoHeight) {
+        canvas.height = videoRef.current.videoHeight
+      }
+    }
+
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
@@ -22,36 +36,34 @@ export default function QualityOverlay({
 
     const box = qualityResult.box
 
-    // Draw Face Bounding Box with rounded corners
+    // Draw Face Bounding Box
     ctx.lineWidth = 2
-    ctx.strokeStyle = isReady ? '#22d3a0' : 'rgba(99, 102, 241, 0.6)'
+    ctx.strokeStyle = isReady ? '#16a34a' : 'rgba(255, 255, 255, 0.45)'
     ctx.strokeRect(box.x, box.y, box.width, box.height)
 
     // Draw Landmark dots subtly
     if (qualityResult.landmarks && qualityResult.landmarks.length > 0) {
-      ctx.fillStyle = isReady ? 'rgba(34, 211, 160, 0.7)' : 'rgba(129, 140, 248, 0.5)'
+      ctx.fillStyle = isReady ? 'rgba(34, 197, 94, 0.9)' : 'rgba(255, 255, 255, 0.65)'
       qualityResult.landmarks.forEach(pt => {
         ctx.beginPath()
-        ctx.arc(pt.x, pt.y, 1.8, 0, 2 * Math.PI)
+        ctx.arc(pt.x, pt.y, 2, 0, 2 * Math.PI)
         ctx.fill()
       })
     }
-  }, [qualityResult, isReady])
+  }, [qualityResult, isReady, videoRef])
 
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
       {/* Canvas for Live Detection Box & Landmarks */}
       <canvas
         ref={canvasRef}
-        width={640}
-        height={480}
         style={{
           position: 'absolute',
           inset: 0,
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          transform: 'scaleX(-1)', // Match mirrored camera
+          transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
         }}
       />
 
@@ -67,18 +79,18 @@ export default function QualityOverlay({
           width: 'min(240px, 65vw)',
           height: 'min(310px, 80vw)',
           borderRadius: '50%',
-          border: `2.5px ${isReady ? 'solid var(--success)' : 'dashed rgba(255,255,255,0.35)'}`,
+          border: `2.5px ${isReady ? 'solid #16a34a' : 'dashed rgba(255,255,255,0.4)'}`,
           boxShadow: isReady
-            ? '0 0 24px rgba(34, 211, 160, 0.4), inset 0 0 16px rgba(34, 211, 160, 0.15)'
+            ? '0 0 20px rgba(22, 163, 74, 0.4), inset 0 0 16px rgba(22, 163, 74, 0.15)'
             : '0 0 12px rgba(0,0,0,0.5)',
-          transition: 'all var(--duration-normal) var(--ease-out)',
+          transition: 'all var(--duration-fast) var(--ease-out)',
           position: 'relative'
         }}>
           {/* Subtle Crosshairs */}
-          <div style={{ position: 'absolute', top: '-8px', left: '50%', width: '2px', height: '16px', background: isReady ? 'var(--success)' : 'rgba(255,255,255,0.4)', transform: 'translateX(-50%)' }} />
-          <div style={{ position: 'absolute', bottom: '-8px', left: '50%', width: '2px', height: '16px', background: isReady ? 'var(--success)' : 'rgba(255,255,255,0.4)', transform: 'translateX(-50%)' }} />
-          <div style={{ position: 'absolute', left: '-8px', top: '50%', height: '2px', width: '16px', background: isReady ? 'var(--success)' : 'rgba(255,255,255,0.4)', transform: 'translateY(-50%)' }} />
-          <div style={{ position: 'absolute', right: '-8px', top: '50%', height: '2px', width: '16px', background: isReady ? 'var(--success)' : 'rgba(255,255,255,0.4)', transform: 'translateY(-50%)' }} />
+          <div style={{ position: 'absolute', top: '-8px', left: '50%', width: '2px', height: '16px', background: isReady ? '#16a34a' : 'rgba(255,255,255,0.4)', transform: 'translateX(-50%)' }} />
+          <div style={{ position: 'absolute', bottom: '-8px', left: '50%', width: '2px', height: '16px', background: isReady ? '#16a34a' : 'rgba(255,255,255,0.4)', transform: 'translateX(-50%)' }} />
+          <div style={{ position: 'absolute', left: '-8px', top: '50%', height: '2px', width: '16px', background: isReady ? '#16a34a' : 'rgba(255,255,255,0.4)', transform: 'translateY(-50%)' }} />
+          <div style={{ position: 'absolute', right: '-8px', top: '50%', height: '2px', width: '16px', background: isReady ? '#16a34a' : 'rgba(255,255,255,0.4)', transform: 'translateY(-50%)' }} />
         </div>
       </div>
 
@@ -90,8 +102,8 @@ export default function QualityOverlay({
           left: '20px',
           right: '20px',
           height: '6px',
-          borderRadius: 'var(--r-full)',
-          background: 'rgba(0,0,0,0.5)',
+          borderRadius: 'var(--r-buttons)',
+          background: 'rgba(0,0,0,0.6)',
           overflow: 'hidden',
           backdropFilter: 'blur(4px)',
           border: '1px solid rgba(255,255,255,0.15)'
@@ -99,10 +111,10 @@ export default function QualityOverlay({
           <div style={{
             height: '100%',
             width: `${Math.min(100, Math.round(holdProgress * 100))}%`,
-            background: 'linear-gradient(90deg, var(--accent), var(--success))',
-            borderRadius: 'var(--r-full)',
+            background: '#16a34a',
+            borderRadius: 'var(--r-buttons)',
             transition: 'width 80ms linear',
-            boxShadow: '0 0 10px var(--success)'
+            boxShadow: '0 0 10px #16a34a'
           }} />
         </div>
       )}
@@ -118,13 +130,13 @@ export default function QualityOverlay({
       }}>
         <div style={{
           padding: '8px 16px',
-          borderRadius: 'var(--r-full)',
-          background: isReady ? 'rgba(7, 28, 20, 0.88)' : 'rgba(20, 18, 12, 0.88)',
-          border: `1px solid ${isReady ? 'rgba(34, 211, 160, 0.5)' : 'rgba(245, 158, 11, 0.5)'}`,
+          borderRadius: 'var(--r-buttons)',
+          background: isReady ? 'rgba(10, 10, 10, 0.92)' : 'rgba(10, 10, 10, 0.88)',
+          border: `1px solid ${isReady ? '#16a34a' : 'rgba(255, 255, 255, 0.2)'}`,
           backdropFilter: 'blur(12px)',
-          color: isReady ? 'var(--success)' : '#fde047',
-          fontSize: '0.8125rem',
-          fontWeight: 600,
+          color: isReady ? '#4ade80' : '#ffffff',
+          fontSize: '13px',
+          fontWeight: 500,
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
@@ -132,11 +144,13 @@ export default function QualityOverlay({
           textAlign: 'center',
           maxWidth: '92%'
         }}>
-          <span style={{ fontSize: '1rem' }}>
+          <span style={{ fontSize: '14px' }}>
             {isReady ? '🟢' : '🟡'}
           </span>
           <span>
-            {isReady ? 'Ready — Hold Still for Capture' : reason}
+            {isReady
+              ? `Ready (${currentYaw !== undefined ? `${currentYaw}°` : ''}) — Hold Still`
+              : `${reason}${currentYaw !== undefined && Math.abs(currentYaw) > 2 ? ` [Yaw: ${currentYaw}°]` : ''}`}
           </span>
         </div>
       </div>

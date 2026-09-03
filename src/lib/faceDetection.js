@@ -3,6 +3,8 @@ import { calculateBrightness, calculateSharpness } from './imageProcessing'
 
 let modelsLoaded = false
 let loadingPromise = null
+let sharedEvalCanvas = null
+let sharedEvalCtx = null
 
 /**
  * Loads face detection and landmark models from local /models directory.
@@ -42,9 +44,9 @@ export async function loadFaceModels(modelsPath = '/models') {
 
 /**
  * Estimates head yaw angle (degrees) from 68 face landmark points.
- * - Negative values (< -15°): Head turned to student's LEFT (camera right)
+ * - Negative values (< -12°): Head turned to student's LEFT (camera sensor right)
  * - Near zero (-12° to +12°): Head facing straight ahead
- * - Positive values (> +15°): Head turned to student's RIGHT (camera left)
+ * - Positive values (> +12°): Head turned to student's RIGHT (camera sensor left)
  * 
  * @param {Array<{x: number, y: number}>} landmarks 
  * @param {{x: number, y: number, width: number, height: number}} box 
@@ -55,36 +57,39 @@ export function estimateYawAngle(landmarks, box) {
     return 0
   }
 
-  const leftJaw = landmarks[0]   // Student's right, camera left
-  const rightJaw = landmarks[16] // Student's left, camera right
+  // Landmark indices (Dlib / face-api standard):
+  // 0: camera-left jaw (student's right)
+  // 16: camera-right jaw (student's left)
+  // 30: nose tip
+  // 36: camera-left eye outer
+  // 45: camera-right eye outer
+  const leftJaw = landmarks[0]
+  const rightJaw = landmarks[16]
   const noseTip = landmarks[30]
   const leftEyeOuter = landmarks[36]
   const rightEyeOuter = landmarks[45]
 
-  // Distance from nose to left/right jaw edges
-  const distToLeftJaw = Math.abs(noseTip.x - leftJaw.x)
-  const distToRightJaw = Math.abs(rightJaw.x - noseTip.x)
+  // Jaw asymmetry:
+  // When turned to student's LEFT: noseTip.x moves toward rightJaw.x (large X in camera frame)
+  // distToRightJaw decreases, distToLeftJaw increases -> asymmetry is NEGATIVE
+  // When turned to student's RIGHT: noseTip.x moves toward leftJaw.x (small X in camera frame)
+  // distToLeftJaw decreases, distToRightJaw increases -> asymmetry is POSITIVE
+  const distToLeftJaw = Math.max(1, Math.abs(noseTip.x - leftJaw.x))
+  const distToRightJaw = Math.max(1, Math.abs(rightJaw.x - noseTip.x))
   const totalJawDist = distToLeftJaw + distToRightJaw
+  const jawAsymmetry = (distToRightJaw - distToLeftJaw) / (totalJawDist || 1)
 
-  if (totalJawDist === 0) return 0
+  // Eye asymmetry (outer eye corner to nose tip distance):
+  const distToLeftEye = Math.max(1, Math.abs(noseTip.x - leftEyeOuter.x))
+  const distToRightEye = Math.max(1, Math.abs(rightEyeOuter.x - noseTip.x))
+  const totalEyeDist = distToLeftEye + distToRightEye
+  const eyeAsymmetry = (distToRightEye - distToLeftEye) / (totalEyeDist || 1)
 
-  // Distance from nose to each eye
-  const distToLeftEye = Math.abs(noseTip.x - leftEyeOuter.x)
-  const distToRightEye = Math.abs(rightEyeOuter.x - noseTip.x)
-  const eyeRatio = distToLeftEye / (distToRightEye || 1)
+  // Weighted blend: Jaw (65%) + Eye (35%)
+  const combinedAsymmetry = jawAsymmetry * 0.65 + eyeAsymmetry * 0.35
 
-  // Asymmetry ratio: 0.5 is centered. > 0.5 means turned right; < 0.5 means turned left.
-  const asymmetry = (distToRightJaw - distToLeftJaw) / totalJawDist
-
-  // Scale asymmetry to approximate degree angle (-60° to +60°)
-  let estimatedYaw = asymmetry * 75
-
-  // Refine using eye distances
-  if (eyeRatio > 1.8) {
-    estimatedYaw = Math.max(estimatedYaw, 25)
-  } else if (eyeRatio < 0.55) {
-    estimatedYaw = Math.min(estimatedYaw, -25)
-  }
+  // Map asymmetry ratio (-0.8 to +0.8) to degrees (-60° to +60°)
+  const estimatedYaw = combinedAsymmetry * 70
 
   return Math.round(estimatedYaw)
 }
@@ -192,10 +197,16 @@ export function evaluateQualityGates(detections, videoElement, expectedPose = 'f
   }
 
   // 4. Pixel-level checks: Brightness & Sharpness via Canvas
-  const canvas = evalCanvas || document.createElement('canvas')
-  canvas.width = videoW
-  canvas.height = videoH
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!sharedEvalCanvas) {
+    sharedEvalCanvas = document.createElement('canvas')
+  }
+  if (sharedEvalCanvas.width !== videoW || sharedEvalCanvas.height !== videoH) {
+    sharedEvalCanvas.width = videoW
+    sharedEvalCanvas.height = videoH
+    sharedEvalCtx = sharedEvalCanvas.getContext('2d', { willReadFrequently: true })
+  }
+  const canvas = evalCanvas || sharedEvalCanvas
+  const ctx = evalCanvas ? evalCanvas.getContext('2d', { willReadFrequently: true }) : sharedEvalCtx
   ctx.drawImage(videoElement, 0, 0, videoW, videoH)
 
   // Brightness check
@@ -209,11 +220,11 @@ export function evaluateQualityGates(detections, videoElement, expectedPose = 'f
     const brightness = Math.round(calculateBrightness(faceImageData))
     result.score.brightness = brightness
 
-    if (brightness < 45) {
+    if (brightness < 25) {
       result.reason = 'Lighting too dark — improve lighting'
       return result
     }
-    if (brightness > 240) {
+    if (brightness > 252) {
       result.reason = 'Too bright / glare detected'
       return result
     }
@@ -222,7 +233,7 @@ export function evaluateQualityGates(detections, videoElement, expectedPose = 'f
     const sharpness = Math.round(calculateSharpness(canvas, ctx, box))
     result.score.sharpness = sharpness
 
-    if (sharpness < 25) {
+    if (sharpness < 10) {
       result.reason = 'Hold still — image blurry'
       return result
     }
@@ -234,7 +245,7 @@ export function evaluateQualityGates(detections, videoElement, expectedPose = 'f
 
   switch (expectedPose) {
     case 'front':
-      // Front neutral: yaw must be within [-15°, +15°]
+      // Front neutral: yaw must be within [-16°, +16°]
       if (Math.abs(yaw) > 16) {
         result.reason = yaw > 16 ? 'Look straight (turn slightly left)' : 'Look straight (turn slightly right)'
         return result
@@ -242,32 +253,32 @@ export function evaluateQualityGates(detections, videoElement, expectedPose = 'f
       break
 
     case 'left':
-      // Subject turns head ~45° to THEIR LEFT (camera yaw < -15°)
-      if (yaw > -14) {
-        result.reason = 'Turn head ~45° to your LEFT'
+      // Left Profile: Turn head to expose LEFT cheek (yaw is negative: <= -8°)
+      if (yaw > -8) {
+        result.reason = 'Turn head to show your LEFT profile'
         return result
       }
-      if (yaw < -55) {
-        result.reason = 'Turned too far — angle ~45° left'
+      if (yaw < -68) {
+        result.reason = 'Turned too far — angle ~45° for left profile'
         return result
       }
       break
 
     case 'right':
-      // Subject turns head ~45° to THEIR RIGHT (camera yaw > +15°)
-      if (yaw < 14) {
-        result.reason = 'Turn head ~45° to your RIGHT'
+      // Right Profile: Turn head to expose RIGHT cheek (yaw is positive: >= +8°)
+      if (yaw < 8) {
+        result.reason = 'Turn head to show your RIGHT profile'
         return result
       }
-      if (yaw > 55) {
-        result.reason = 'Turned too far — angle ~45° right'
+      if (yaw > 68) {
+        result.reason = 'Turned too far — angle ~45° for right profile'
         return result
       }
       break
 
     case 'overall':
-      // Overall clear shot: look straight, high clarity
-      if (Math.abs(yaw) > 16) {
+      // Overall clear shot: look straight, neutral expression
+      if (Math.abs(yaw) > 18) {
         result.reason = 'Look directly at camera for final shot'
         return result
       }

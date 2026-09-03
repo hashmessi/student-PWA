@@ -5,6 +5,9 @@ import RegistrationForm from './components/RegistrationForm'
 import StudentList from './components/StudentList'
 import CameraCapture from './components/CameraCapture'
 import ReviewScreen from './components/ReviewScreen'
+import AdminAuthModal from './components/AdminAuthModal'
+import SubmissionSuccess from './components/SubmissionSuccess'
+import { isAdminAuthenticated, logoutAdmin } from './lib/auth'
 
 // PWA Install Prompt Banner
 function InstallPrompt() {
@@ -52,25 +55,38 @@ function InstallPrompt() {
   return (
     <div
       id="install-prompt-banner"
+      className="card"
       style={{
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(99,102,241,0.06))',
-        border: '1px solid var(--border-accent)',
-        borderRadius: 'var(--r-md)',
         padding: '12px 16px',
         marginBottom: 'var(--space-4)',
         display: 'flex',
         alignItems: 'center',
         gap: 'var(--space-3)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
       }}
     >
-      <span style={{ fontSize: '1.4rem' }}>📲</span>
+      <div
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: 'var(--r-buttons)',
+          background: 'var(--color-canvas)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--color-ink)',
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+          <line x1="12" y1="18" x2="12.01" y2="18"/>
+        </svg>
+      </div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-          Install Web App
+        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
+          Install Progressive Web App
         </div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-          Add to home screen for fast offline dataset collection
+        <div style={{ fontSize: '12px', color: 'var(--color-mid-gray)' }}>
+          Launch full-screen offline from your desktop or home screen
         </div>
       </div>
       <button
@@ -85,7 +101,6 @@ function InstallPrompt() {
         className="btn btn--icon btn--ghost"
         onClick={() => setVisible(false)}
         aria-label="Dismiss install prompt"
-        style={{ color: 'var(--text-muted)' }}
       >
         ✕
       </button>
@@ -94,11 +109,22 @@ function InstallPrompt() {
 }
 
 function AppContent() {
-  const [page, setPage] = useState('list') // 'list' | 'register' | 'capture' | 'review'
+  const [isAdmin, setIsAdmin] = useState(() => isAdminAuthenticated())
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [page, setPage] = useState('register') // 'register' | 'capture' | 'review' | 'success' | 'list'
   const [activeStudent, setActiveStudent] = useState(null)
   const [activeCaptures, setActiveCaptures] = useState({})
   const [isRetakeMode, setIsRetakeMode] = useState(false)
   const [targetPoseIndex, setTargetPoseIndex] = useState(0)
+  const [submittedStudent, setSubmittedStudent] = useState(null)
+  const { show } = useToast()
+
+  // Guard: if non-admin is on 'list' page, redirect to 'register'
+  useEffect(() => {
+    if (page === 'list' && !isAdmin) {
+      setPage('register')
+    }
+  }, [page, isAdmin])
 
   // 1. Initial registration completed -> Go to camera capture for all 4 poses
   const handleRegistrationComplete = (student) => {
@@ -144,28 +170,56 @@ function AppContent() {
   }
 
   // 6. Dataset confirmed & saved to IndexedDB
-  const handleDatasetSaved = () => {
+  const handleDatasetSaved = (savedStudent) => {
+    const studentInfo = savedStudent || activeStudent
+    setSubmittedStudent(studentInfo)
     setActiveStudent(null)
     setActiveCaptures({})
     setIsRetakeMode(false)
+    setPage('success')
+  }
+
+  // Admin lock / logout
+  const handleLockAdmin = () => {
+    logoutAdmin()
+    setIsAdmin(false)
+    setActiveStudent(null)
+    setActiveCaptures({})
+    setPage('register')
+    show('Admin session locked. Switched to Student Intake Mode.', 'info')
+  }
+
+  // Admin login success
+  const handleAdminAuthSuccess = () => {
+    setIsAdmin(true)
     setPage('list')
+    show('Admin access granted! Dataset console unlocked.', 'success')
   }
 
   return (
     <div className="app-shell pt-safe pb-safe">
+      {/* Admin Passcode Authentication Modal */}
+      <AdminAuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAdminAuthSuccess}
+      />
+
       <header className="app-header">
         <div
           className="app-header-icon"
           aria-hidden="true"
           onClick={() => {
-            setActiveStudent(null)
-            setActiveCaptures({})
-            setPage('list')
+            if (isAdmin) {
+              setPage('list')
+            } else {
+              setPage('register')
+            }
           }}
           style={{ cursor: 'pointer' }}
-          title="Return to Student List"
+          title={isAdmin ? "Go to Admin Roster" : "Student Face Capture"}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--accent-hover)' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-ink)' }}>
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
             <circle cx="12" cy="13" r="4"/>
           </svg>
@@ -174,39 +228,63 @@ function AppContent() {
           <div className="app-header-title">Student Face Capture</div>
           <div className="app-header-subtitle">Smart Attendance · Dept of IT</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span className="badge badge--success" style={{ fontSize: '0.6875rem', letterSpacing: '0.04em' }}>
-            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 8px var(--success)' }} />
-            OFFLINE VAULT
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isAdmin ? (
+            <>
+              {page !== 'list' && (
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  onClick={() => setPage('list')}
+                  style={{ fontSize: '11px', padding: '4px 10px', minHeight: '26px' }}
+                >
+                  📁 Admin Roster
+                </button>
+              )}
+              <button
+                id="header-lock-btn"
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={handleLockAdmin}
+                style={{ fontSize: '11px', padding: '4px 8px', minHeight: '26px', color: 'var(--color-mid-gray)' }}
+                title="Lock admin session"
+              >
+                🔒 Lock
+              </button>
+            </>
+          ) : (
+            <button
+              id="header-admin-vault-btn"
+              type="button"
+              className="btn btn--secondary btn--sm"
+              onClick={() => setShowAuthModal(true)}
+              style={{ fontSize: '11px', padding: '4px 10px', minHeight: '26px' }}
+            >
+              🔒 Admin Vault
+            </button>
+          )}
         </div>
       </header>
 
-      {page === 'list' && <InstallPrompt />}
+      {isAdmin && page === 'list' && <InstallPrompt />}
 
       <main>
-        {page === 'list' && (
-          <StudentList
-            onNewStudent={() => {
-              setActiveStudent(null)
-              setActiveCaptures({})
-              setPage('register')
-            }}
-            onRecaptureStudent={handleRecaptureStudent}
-          />
-        )}
-
+        {/* Student Registration Form (Primary Student Intake Portal) */}
         {page === 'register' && (
           <RegistrationForm
             student={activeStudent}
+            isAdmin={isAdmin}
             onBack={() => {
               setActiveStudent(null)
-              setPage('list')
+              if (isAdmin) {
+                setPage('list')
+              }
             }}
             onComplete={handleRegistrationComplete}
           />
         )}
 
+        {/* 4-Step Biometric Camera Viewport */}
         {page === 'capture' && activeStudent && (
           <CameraCapture
             student={activeStudent}
@@ -216,8 +294,10 @@ function AppContent() {
             onCancel={() => {
               if (Object.keys(activeCaptures).length === 4 || isRetakeMode) {
                 setPage('review')
-              } else {
+              } else if (isAdmin) {
                 setPage('list')
+              } else {
+                setPage('register')
               }
             }}
             onComplete={handleCaptureComplete}
@@ -225,6 +305,7 @@ function AppContent() {
           />
         )}
 
+        {/* Review & Angle Verification Screen */}
         {page === 'review' && activeStudent && (
           <ReviewScreen
             student={activeStudent}
@@ -234,9 +315,39 @@ function AppContent() {
               setActiveStudent(null)
               setActiveCaptures({})
               setIsRetakeMode(false)
-              setPage('list')
+              if (isAdmin) {
+                setPage('list')
+              } else {
+                setPage('register')
+              }
             }}
             onSaved={handleDatasetSaved}
+          />
+        )}
+
+        {/* Student Submission Confirmation Screen */}
+        {page === 'success' && (
+          <SubmissionSuccess
+            student={submittedStudent}
+            onRegisterNext={() => {
+              setSubmittedStudent(null)
+              setActiveStudent(null)
+              setActiveCaptures({})
+              setPage('register')
+            }}
+          />
+        )}
+
+        {/* Admin Roster & Master Export Dashboard (Protected) */}
+        {page === 'list' && isAdmin && (
+          <StudentList
+            onNewStudent={() => {
+              setActiveStudent(null)
+              setActiveCaptures({})
+              setPage('register')
+            }}
+            onRecaptureStudent={handleRecaptureStudent}
+            onLockAdmin={handleLockAdmin}
           />
         )}
       </main>

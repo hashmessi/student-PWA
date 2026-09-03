@@ -5,9 +5,9 @@ import { generateSingleStudentZip, downloadBlob } from '../lib/exportEngine'
 
 const POSE_INFO = {
   front: { title: 'Front Pose', icon: '👤', angle: '0° Neutral' },
-  left: { title: 'Left Pose', icon: '👈', angle: '~45° Left' },
-  right: { title: 'Right Pose', icon: '👉', angle: '~45° Right' },
-  overall: { title: 'Overall Clear', icon: '✨', angle: 'Neutral Gaze' },
+  left: { title: 'Left Profile', icon: '👈', angle: 'Left Cheek' },
+  right: { title: 'Right Profile', icon: '👉', angle: 'Right Cheek' },
+  overall: { title: 'Overall Clarity', icon: '✨', angle: '720×720' },
 }
 
 export default function StudentDetailModal({
@@ -90,22 +90,19 @@ export default function StudentDetailModal({
           style={{ padding: 'var(--space-4)', zIndex: 130 }}
         >
           <div
-            className="card card--elevated"
+            className="card"
             onClick={e => e.stopPropagation()}
             style={{
               maxWidth: '440px',
               width: '100%',
               padding: '16px',
-              background: 'var(--bg-surface)',
-              borderColor: 'var(--border-accent)',
               display: 'flex',
               flexDirection: 'column',
               gap: '12px',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.8)'
             }}
           >
             <div className="row-between">
-              <strong style={{ fontSize: '0.9375rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <strong style={{ fontSize: '14px', color: 'var(--color-ink)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span>{POSE_INFO[lightboxPose].icon}</span>
                 <span>{POSE_INFO[lightboxPose].title}</span>
               </strong>
@@ -120,10 +117,10 @@ export default function StudentDetailModal({
             <div style={{
               width: '100%',
               aspectRatio: '1 / 1',
-              borderRadius: 'var(--r-md)',
+              borderRadius: 'var(--r-nested)',
               overflow: 'hidden',
               background: '#000',
-              border: '1px solid var(--border-base)',
+              border: '1px solid var(--color-hairline)',
             }}>
               <img
                 src={photos[lightboxPose].dataUrl}
@@ -131,7 +128,7 @@ export default function StudentDetailModal({
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </div>
-            <div className="row-between" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            <div className="row-between" style={{ fontSize: '12px', color: 'var(--color-mid-gray)' }}>
               <span>Standard: 720×720 JPEG @ 85%</span>
               <span className="font-mono">{POSE_INFO[lightboxPose].angle}</span>
             </div>
@@ -141,7 +138,7 @@ export default function StudentDetailModal({
 
       {/* Main Detail Sheet */}
       <div
-        className="card card--elevated"
+        className="card"
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
@@ -149,11 +146,7 @@ export default function StudentDetailModal({
           maxHeight: '90vh',
           overflowY: 'auto',
           padding: '22px',
-          background: 'var(--bg-surface)',
-          borderColor: 'var(--border-accent)',
-          borderRadius: 'var(--r-xl)',
-          animation: 'page-enter 0.25s var(--ease-out) both',
-          boxShadow: '0 12px 40px rgba(0,0,0,0.6)'
+          animation: 'page-enter 0.2s var(--ease-out) both',
         }}
       >
         {/* Header Row */}
@@ -161,9 +154,9 @@ export default function StudentDetailModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span className="badge badge--accent font-mono">{student.regNo}</span>
             {student.status === 'complete' ? (
-              <span className="badge badge--success">✓ 4/4 Poses Verified</span>
+              <span className="badge badge--success">✓ 4/4 Verified</span>
             ) : (
-              <span className="badge badge--warning">◆ Capture Incomplete</span>
+              <span className="badge badge--warning">◆ Incomplete</span>
             )}
           </div>
           <button
@@ -179,15 +172,15 @@ export default function StudentDetailModal({
         {/* Student Credential Info */}
         <div style={{ marginBottom: 'var(--space-4)' }}>
           <h2 style={{ fontSize: '1.375rem', marginBottom: '4px', letterSpacing: '-0.02em' }}>{student.name}</h2>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <span>🏛 Dept of {student.dept}</span>
+          <div style={{ fontSize: '13px', color: 'var(--color-mid-gray)', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <span>Dept of {student.dept}</span>
             <span>•</span>
             <span>Section {student.section}</span>
             <span>•</span>
-            <span className="font-mono">✉ {student.email}</span>
+            <span className="font-mono">{student.email}</span>
           </div>
           {student.capturedAt && (
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--color-mid-gray)', marginTop: '4px' }}>
               Timestamp: {new Date(student.capturedAt).toLocaleString()}
             </div>
           )}
@@ -196,17 +189,17 @@ export default function StudentDetailModal({
         {/* 4 Photos Grid */}
         <div style={{ marginBottom: 'var(--space-5)' }}>
           <div className="row-between" style={{ marginBottom: 'var(--space-2)' }}>
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ink)' }}>
               Biometric Photo Matrix ({photoCount}/4)
             </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--accent-hover)', fontFamily: 'var(--font-mono)' }}>
-              Click photo to inspect 720×720
+            <span style={{ fontSize: '11px', color: 'var(--color-mid-gray)', fontFamily: 'var(--font-mono)' }}>
+              Click to inspect 720×720
             </span>
           </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-              <span style={{ animation: 'spin 1s linear infinite' }}>⏳</span> Retrieving images from IndexedDB vault…
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--color-mid-gray)', fontSize: '13px' }}>
+              Loading images from local vault…
             </div>
           ) : (
             <div
@@ -226,12 +219,12 @@ export default function StudentDetailModal({
                     style={{
                       position: 'relative',
                       aspectRatio: '1 / 1',
-                      borderRadius: 'var(--r-md)',
+                      borderRadius: 'var(--r-nested)',
                       overflow: 'hidden',
-                      background: 'var(--bg-elevated)',
-                      border: photo ? '1px solid var(--border-accent)' : '1px solid var(--border-subtle)',
+                      background: 'var(--color-canvas)',
+                      border: '1px solid var(--color-hairline)',
                       cursor: photo ? 'pointer' : 'default',
-                      transition: 'transform var(--duration-fast) var(--ease-out)'
+                      transition: 'border-color var(--duration-fast) var(--ease-out)'
                     }}
                     onClick={() => photo && setLightboxPose(pose)}
                     title={photo ? `Click to inspect 720×720 ${info.title}` : 'Not yet captured'}
@@ -249,11 +242,10 @@ export default function StudentDetailModal({
                           right: '6px',
                           padding: '2px 6px',
                           borderRadius: 'var(--r-sm)',
-                          background: 'rgba(0,0,0,0.75)',
-                          backdropFilter: 'blur(4px)',
-                          color: 'var(--text-secondary)',
-                          fontSize: '9px',
-                          fontWeight: 600
+                          background: 'rgba(0,0,0,0.7)',
+                          color: '#ffffff',
+                          fontSize: '10px',
+                          fontWeight: 500
                         }}>
                           🔍 720p
                         </div>
@@ -266,12 +258,12 @@ export default function StudentDetailModal({
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: 'var(--text-muted)',
-                        fontSize: '0.75rem',
+                        color: 'var(--color-mid-gray)',
+                        fontSize: '12px',
                         gap: '4px',
                       }}>
                         <span>{info.icon}</span>
-                        <span>Pending Capture</span>
+                        <span>Pending</span>
                       </div>
                     )}
 
@@ -281,11 +273,10 @@ export default function StudentDetailModal({
                       left: '4px',
                       padding: '2px 6px',
                       borderRadius: 'var(--r-sm)',
-                      background: 'rgba(7, 7, 12, 0.85)',
-                      backdropFilter: 'blur(4px)',
-                      color: 'var(--text-primary)',
+                      background: 'rgba(10, 10, 10, 0.85)',
+                      color: '#ffffff',
                       fontSize: '10px',
-                      fontWeight: 600,
+                      fontWeight: 500,
                     }}>
                       {info.title.split(' ')[0]}
                     </div>
@@ -301,16 +292,16 @@ export default function StudentDetailModal({
           <div
             style={{
               padding: '14px',
-              borderRadius: 'var(--r-md)',
+              borderRadius: 'var(--r-nested)',
               background: 'var(--danger-subtle)',
-              border: '1px solid rgba(239,68,68,0.3)',
+              border: '1px solid var(--danger-border)',
               marginBottom: 'var(--space-3)',
             }}
           >
-            <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#fca5a5', marginBottom: '8px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-ember)', marginBottom: '4px' }}>
               Confirm Permanent Deletion?
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--color-ink-soft)', marginBottom: '12px' }}>
               All 4 biometric photos and metadata for {student.name} will be purged from local storage.
             </div>
             <div className="row" style={{ gap: '8px' }}>
@@ -348,7 +339,6 @@ export default function StudentDetailModal({
                 className="btn btn--secondary btn--full btn--sm"
                 onClick={handleExportSingle}
                 disabled={isExporting}
-                style={{ borderColor: 'var(--border-accent)' }}
               >
                 {isExporting ? 'Generating ZIP…' : `📦 Export ${student.regNo} Folder (ZIP)`}
               </button>

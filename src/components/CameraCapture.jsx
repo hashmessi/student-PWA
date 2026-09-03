@@ -21,10 +21,10 @@ export default function CameraCapture({
   const [modelsReady, setModelsReady] = useState(false)
   const [modelsError, setModelsError] = useState(null)
   const [cameraError, setCameraError] = useState(null)
+  const [facingMode, setFacingMode] = useState('user') // 'user' | 'environment'
   const [qualityResult, setQualityResult] = useState(null)
   const [holdProgress, setHoldProgress] = useState(0)
   const [isCapturing, setIsCapturing] = useState(false)
-  const [facingMode, setFacingMode] = useState('user')
   const [autoCaptureEnabled, setAutoCaptureEnabled] = useState(true)
 
   const videoRef = useRef(null)
@@ -32,39 +32,53 @@ export default function CameraCapture({
   const animFrameRef = useRef(null)
   const holdStartTimeRef = useRef(null)
   const isCapturingRef = useRef(false)
+  const isEvaluatingRef = useRef(false)
   const qualityRef = useRef(null)
+  const capturesRef = useRef(existingCaptures)
+
   const { show } = useToast()
+  const currentPose = POSE_SEQUENCE[currentStepIndex] || 'front'
 
-  const currentPose = POSE_SEQUENCE[currentStepIndex]
+  // Keep capturesRef in sync
+  useEffect(() => {
+    capturesRef.current = capturedImages
+  }, [capturedImages])
 
-  // 1. Load models on mount
+  // 1. Load WASM Neural Models
   useEffect(() => {
     let mounted = true
-    loadFaceModels()
-      .then(() => {
+    async function initModels() {
+      try {
+        await loadFaceModels('/models')
         if (mounted) setModelsReady(true)
-      })
-      .catch(err => {
-        if (mounted) setModelsError('Failed to load face detection neural network.')
-      })
+      } catch (err) {
+        console.error('Failed to load neural models:', err)
+        if (mounted) {
+          setModelsError('Face detection models failed to load. Check network or cache.')
+          show('Failed to initialize face detection model', 'error')
+        }
+      }
+    }
+    initModels()
     return () => { mounted = false }
-  }, [])
+  }, [show])
 
-  // 2. Start Camera Stream
+  // 2. Initialize Camera Media Stream
   const startCamera = useCallback(async () => {
+    setCameraError(null)
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
+      streamRef.current.getTracks().forEach(track => track.stop())
     }
 
     try {
-      setCameraError(null)
       const constraints = {
         audio: false,
         video: {
-          facingMode,
+          facingMode: { ideal: facingMode },
           width: { ideal: 1280, min: 640 },
           height: { ideal: 720, min: 480 },
-        },
+          frameRate: { ideal: 30, max: 30 },
+        }
       }
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
@@ -72,19 +86,25 @@ export default function CameraCapture({
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        await videoRef.current.play()
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current.play().catch(e => console.warn('Autoplay prevented:', e))
+        }
       }
     } catch (err) {
-      console.error('Camera access error:', err)
-      setCameraError('Camera access denied or unavailable. Please grant permission.')
+      console.error('Camera stream error:', err)
+      const msg = err.name === 'NotAllowedError'
+        ? 'Camera permission denied. Please allow camera access in browser settings.'
+        : 'Could not connect to camera device.'
+      setCameraError(msg)
+      show(msg, 'error')
     }
-  }, [facingMode])
+  }, [facingMode, show])
 
   useEffect(() => {
     startCamera()
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current.getTracks().forEach(track => track.stop())
       }
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current)
@@ -97,6 +117,7 @@ export default function CameraCapture({
     if (isCapturingRef.current || !videoRef.current) return
     isCapturingRef.current = true
     setIsCapturing(true)
+    setHoldProgress(1)
 
     try {
       const box = qualityRef.current?.box || null
@@ -110,14 +131,19 @@ export default function CameraCapture({
       }
 
       const updatedCaptures = {
-        ...capturedImages,
+        ...capturesRef.current,
         [currentPose]: captureRecord,
       }
 
+      capturesRef.current = updatedCaptures
       setCapturedImages(updatedCaptures)
 
       if (navigator.vibrate) navigator.vibrate(50)
-      show(`Captured ${currentPose.toUpperCase()} pose!`, 'success', 2000)
+      show(`✓ ${currentPose.toUpperCase()} pose captured!`, 'success', 1800)
+
+      // Reset hold states immediately
+      holdStartTimeRef.current = null
+      setHoldProgress(0)
 
       // If in single-pose retake mode, return immediately to Review with the updated pose
       if (retakeMode && onRetakeComplete) {
@@ -125,7 +151,7 @@ export default function CameraCapture({
           setIsCapturing(false)
           isCapturingRef.current = false
           onRetakeComplete(currentPose, captureRecord)
-        }, 400)
+        }, 350)
         return
       }
 
@@ -133,59 +159,72 @@ export default function CameraCapture({
       if (currentStepIndex < POSE_SEQUENCE.length - 1) {
         setTimeout(() => {
           setCurrentStepIndex(prev => prev + 1)
-          setHoldProgress(0)
-          holdStartTimeRef.current = null
           setIsCapturing(false)
           isCapturingRef.current = false
-        }, 400)
+        }, 350)
       } else {
         setTimeout(() => {
           setIsCapturing(false)
           isCapturingRef.current = false
           onComplete(student, updatedCaptures)
-        }, 500)
+        }, 400)
       }
     } catch (err) {
       console.error('Capture compression error:', err)
       show('Failed to capture frame', 'error')
       setIsCapturing(false)
       isCapturingRef.current = false
+      holdStartTimeRef.current = null
+      setHoldProgress(0)
     }
-  }, [currentPose, currentStepIndex, capturedImages, student, retakeMode, onRetakeComplete, onComplete, show])
+  }, [currentPose, currentStepIndex, student, retakeMode, onRetakeComplete, onComplete, show])
 
   // 4. Real-time Detection & Quality Evaluation Loop
   useEffect(() => {
     if (!modelsReady || cameraError) return
 
     let lastEvalTime = 0
-    const evalInterval = 80
-    const REQUIRED_HOLD_MS = 900
+    const evalInterval = 75
+    const REQUIRED_HOLD_MS = 600
 
     const checkFrame = async (timestamp) => {
-      if (videoRef.current && videoRef.current.readyState >= 2 && !isCapturingRef.current) {
+      if (
+        videoRef.current &&
+        videoRef.current.readyState >= 2 &&
+        !isCapturingRef.current &&
+        !isEvaluatingRef.current
+      ) {
         if (timestamp - lastEvalTime >= evalInterval) {
           lastEvalTime = timestamp
-          const detections = await detectFacesInVideo(videoRef.current)
-          const evaluation = evaluateQualityGates(detections, videoRef.current, currentPose)
+          isEvaluatingRef.current = true
 
-          setQualityResult(evaluation)
-          qualityRef.current = evaluation
+          try {
+            const detections = await detectFacesInVideo(videoRef.current)
+            const evaluation = evaluateQualityGates(detections, videoRef.current, currentPose)
 
-          // Auto-capture stabilization timer logic
-          if (evaluation.passed && autoCaptureEnabled) {
-            if (!holdStartTimeRef.current) {
-              holdStartTimeRef.current = timestamp
+            setQualityResult(evaluation)
+            qualityRef.current = evaluation
+
+            // Auto-capture stabilization timer logic
+            if (evaluation.passed && autoCaptureEnabled && !isCapturingRef.current) {
+              if (!holdStartTimeRef.current) {
+                holdStartTimeRef.current = timestamp
+              }
+              const elapsed = timestamp - holdStartTimeRef.current
+              const progress = Math.min(1, elapsed / REQUIRED_HOLD_MS)
+              setHoldProgress(progress)
+
+              if (elapsed >= REQUIRED_HOLD_MS && !isCapturingRef.current) {
+                executeCapture()
+              }
+            } else {
+              holdStartTimeRef.current = null
+              setHoldProgress(0)
             }
-            const elapsed = timestamp - holdStartTimeRef.current
-            const progress = Math.min(1, elapsed / REQUIRED_HOLD_MS)
-            setHoldProgress(progress)
-
-            if (elapsed >= REQUIRED_HOLD_MS && !isCapturingRef.current) {
-              executeCapture()
-            }
-          } else {
-            holdStartTimeRef.current = null
-            setHoldProgress(0)
+          } catch (e) {
+            console.warn('Frame evaluation warning:', e)
+          } finally {
+            isEvaluatingRef.current = false
           }
         }
       }
@@ -218,10 +257,10 @@ export default function CameraCapture({
           ✕ {retakeMode ? 'Cancel Retake' : 'Cancel'}
         </button>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-ink)' }}>
             {student.name}
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+          <div style={{ fontSize: '12px', color: 'var(--color-mid-gray)', fontFamily: 'var(--font-mono)' }}>
             {student.regNo} · {student.dept}-{student.section}
           </div>
         </div>
@@ -240,11 +279,10 @@ export default function CameraCapture({
           width: '100%',
           aspectRatio: '3 / 4',
           maxHeight: '56vh',
-          borderRadius: 'var(--r-xl)',
+          borderRadius: 'var(--r-cards)',
           overflow: 'hidden',
           background: '#000000',
-          border: '1px solid var(--border-base)',
-          boxShadow: 'var(--shadow-lg)',
+          border: '1px solid var(--color-hairline)',
           marginTop: 'var(--space-2)',
           marginBottom: 'var(--space-4)',
         }}
@@ -270,6 +308,8 @@ export default function CameraCapture({
             expectedPose={currentPose}
             holdProgress={holdProgress}
             isCapturing={isCapturing}
+            videoRef={videoRef}
+            facingMode={facingMode}
           />
         )}
 
@@ -278,35 +318,35 @@ export default function CameraCapture({
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: 'rgba(7, 7, 12, 0.92)',
+            background: 'rgba(245, 245, 245, 0.95)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '12px',
-            color: 'var(--text-primary)'
+            color: 'var(--color-ink)'
           }}>
             <div style={{
-              width: '36px',
-              height: '36px',
+              width: '32px',
+              height: '32px',
               borderRadius: '50%',
-              border: '3px solid rgba(99, 102, 241, 0.2)',
-              borderTopColor: 'var(--accent)',
+              border: '2px solid var(--color-hairline)',
+              borderTopColor: 'var(--color-ink)',
               animation: 'spin 0.8s linear infinite'
             }} />
-            <div style={{ fontSize: '0.9375rem', fontWeight: 600 }}>Loading Offline Neural Models…</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600 }}>Loading Offline Neural Models…</div>
+            <div style={{ fontSize: '12px', color: 'var(--color-mid-gray)', fontFamily: 'var(--font-mono)' }}>
               TinyFaceDetector (WASM) · Local Cache
             </div>
           </div>
         )}
 
-        {/* Camera Permission Error with Troubleshooting Hint */}
+        {/* Camera Permission Error */}
         {cameraError && (
           <div style={{
             position: 'absolute',
             inset: 0,
-            background: 'rgba(7, 7, 12, 0.96)',
+            background: 'rgba(245, 245, 245, 0.98)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -316,21 +356,21 @@ export default function CameraCapture({
             gap: '12px'
           }}>
             <div style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
+              width: '44px',
+              height: '44px',
+              borderRadius: 'var(--r-buttons)',
               background: 'var(--danger-subtle)',
-              border: '1px solid rgba(239,68,68,0.4)',
+              border: '1px solid var(--danger-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '22px',
-              color: 'var(--danger)'
+              fontSize: '20px',
+              color: 'var(--color-ember)'
             }}>
               ⛔
             </div>
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--danger)' }}>Camera Access Blocked</div>
-            <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', maxWidth: '320px', lineHeight: '1.45' }}>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-ink)' }}>Camera Access Blocked</div>
+            <div style={{ fontSize: '13px', color: 'var(--color-mid-gray)', maxWidth: '320px', lineHeight: '1.45' }}>
               {cameraError} Check the camera permissions icon in your browser address bar and grant access to continue.
             </div>
             <button className="btn btn--primary btn--sm" onClick={startCamera} style={{ marginTop: '4px' }}>
@@ -350,10 +390,9 @@ export default function CameraCapture({
             right: '12px',
             width: '38px',
             height: '38px',
-            borderRadius: '50%',
-            background: 'rgba(22, 22, 30, 0.8)',
+            borderRadius: 'var(--r-buttons)',
+            background: 'rgba(10, 10, 10, 0.8)',
             border: '1px solid rgba(255,255,255,0.2)',
-            backdropFilter: 'blur(8px)',
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
@@ -377,30 +416,32 @@ export default function CameraCapture({
         <button
           id="toggle-autocapture-btn"
           type="button"
-          className="btn btn--ghost btn--sm"
-          onClick={() => setAutoCaptureEnabled(prev => !prev)}
+          className="btn btn--secondary btn--sm"
+          onClick={() => {
+            setAutoCaptureEnabled(prev => !prev)
+            holdStartTimeRef.current = null
+            setHoldProgress(0)
+          }}
           style={{
-            fontSize: '0.75rem',
-            color: autoCaptureEnabled ? 'var(--accent-hover)' : 'var(--text-muted)'
+            fontSize: '12px',
           }}
         >
-          {autoCaptureEnabled ? '⚡ Auto-Capture: ON' : '🖐 Auto-Capture: OFF'}
+          {autoCaptureEnabled ? '⚡ Auto-Capture: ON' : '🖐 Manual Mode'}
         </button>
 
-        {/* Manual Shutter Button */}
+        {/* Manual Shutter Button - Always functional when camera is active */}
         <button
           id="manual-capture-btn"
           type="button"
           className="btn btn--primary btn--lg"
           onClick={executeCapture}
-          disabled={!qualityResult?.passed || isCapturing}
+          disabled={isCapturing || !modelsReady || Boolean(cameraError)}
           style={{
             flex: 1,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
-            boxShadow: qualityResult?.passed ? '0 0 20px var(--accent-glow)' : 'none',
           }}
         >
           <span>📸</span>

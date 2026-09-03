@@ -7,62 +7,48 @@ import { generateExportZip, downloadBlob } from '../lib/exportEngine'
 function EmptyState({ onNewStudent, onSeedDemo, isSeeding }) {
   return (
     <div
-      className="card card--elevated"
+      className="card"
       style={{
-        padding: 'var(--space-8) var(--space-6)',
+        padding: '32px 24px',
         marginTop: 'var(--space-2)',
-        borderColor: 'var(--border-accent)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
         textAlign: 'center'
       }}
     >
       {/* Top Station Badge */}
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '6px 14px',
-          borderRadius: 'var(--r-full)',
-          background: 'rgba(99, 102, 241, 0.14)',
-          border: '1px solid var(--border-accent)',
-          fontSize: '0.75rem',
-          fontWeight: 700,
-          color: 'var(--accent-hover)',
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase'
-        }}>
-          <span>⚡</span> Dataset Intake Console
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
+        <div className="badge badge--muted">
+          <span>⚡</span>
+          <span>DATASET INTAKE CONSOLE</span>
         </div>
       </div>
 
-      <h2 style={{ fontSize: '1.5rem', marginBottom: 'var(--space-2)', letterSpacing: '-0.02em' }}>
+      <h2 style={{ fontSize: '1.5rem', marginBottom: '6px', color: 'var(--color-ink)' }}>
         Biometric Collection Station
       </h2>
       <p style={{
-        fontSize: '0.875rem',
+        fontSize: '14px',
         maxWidth: '440px',
         margin: '0 auto var(--space-6)',
-        color: 'var(--text-secondary)',
-        lineHeight: '1.55'
+        color: 'var(--color-mid-gray)',
+        lineHeight: '1.5'
       }}>
-        Collect, auto-validate, and export 4-angle facial datasets for training and embedding into the Smart Attendance Neural Model.
+        Collect, auto-validate, and export 4-angle facial datasets for training the Smart Attendance face recognition model.
       </p>
 
       {/* 4-Step Biometric Pipeline Visualizer */}
       <div style={{
-        background: 'var(--bg-void)',
-        borderRadius: 'var(--r-lg)',
-        border: '1px solid var(--border-subtle)',
-        padding: '16px 12px',
+        background: 'var(--color-surface-alt)',
+        borderRadius: 'var(--r-cards)',
+        border: '1px solid var(--color-hairline)',
+        padding: '16px 14px',
         marginBottom: 'var(--space-6)'
       }}>
         <div style={{
-          fontSize: '0.6875rem',
-          fontWeight: 700,
-          color: 'var(--text-muted)',
+          fontSize: '11px',
+          fontWeight: 600,
+          color: 'var(--color-mid-gray)',
           textTransform: 'uppercase',
-          letterSpacing: '0.06em',
+          letterSpacing: '0.05em',
           marginBottom: '12px'
         }}>
           Standard 4-Pose In-Browser Biometric Gate
@@ -78,7 +64,7 @@ function EmptyState({ onNewStudent, onSeedDemo, isSeeding }) {
             <div key={item.step} className="pipeline-item">
               <span className="pipeline-item-icon">{item.icon}</span>
               <div className="pipeline-item-name">{item.pose}</div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--accent-hover)', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--color-mid-gray)', fontFamily: 'var(--font-mono)' }}>
                 {item.angle}
               </div>
               <div className="pipeline-item-desc">{item.desc}</div>
@@ -88,16 +74,11 @@ function EmptyState({ onNewStudent, onSeedDemo, isSeeding }) {
       </div>
 
       {/* Primary Hero Actions */}
-      <div style={{ maxWidth: '380px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ maxWidth: '340px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
         <button
           id="empty-new-student-btn"
           className="btn btn--primary btn--lg btn--full"
           onClick={onNewStudent}
-          style={{
-            fontSize: '1rem',
-            padding: '14px 20px',
-            boxShadow: '0 4px 20px var(--accent-glow)'
-          }}
         >
           + Register & Capture Student
         </button>
@@ -105,14 +86,9 @@ function EmptyState({ onNewStudent, onSeedDemo, isSeeding }) {
         <button
           id="empty-seed-demo-btn"
           type="button"
-          className="btn btn--secondary btn--md btn--full"
+          className="btn btn--secondary btn--full"
           onClick={onSeedDemo}
           disabled={isSeeding}
-          style={{
-            borderColor: 'var(--border-accent)',
-            fontSize: '0.875rem',
-            background: 'rgba(99, 102, 241, 0.08)'
-          }}
         >
           {isSeeding ? 'Loading Demo Roster…' : '⚡ Load Sample Students (Demo Mode)'}
         </button>
@@ -122,19 +98,19 @@ function EmptyState({ onNewStudent, onSeedDemo, isSeeding }) {
       <div style={{
         marginTop: 'var(--space-6)',
         paddingTop: 'var(--space-4)',
-        borderTop: '1px solid var(--border-subtle)',
+        borderTop: '1px solid var(--color-hairline)',
         display: 'flex',
         justifyContent: 'center',
-        gap: '16px',
-        fontSize: '0.725rem',
-        color: 'var(--text-muted)',
+        gap: '14px',
+        fontSize: '12px',
+        color: 'var(--color-mid-gray)',
         flexWrap: 'wrap'
       }}>
         <span>🔒 100% Offline IndexedDB</span>
         <span>•</span>
         <span>📁 Non-Mixed Folder Architecture</span>
         <span>•</span>
-        <span>⚡ WASM Face Detection</span>
+        <span>⚡ WASM Neural Gate</span>
       </div>
     </div>
   )
@@ -152,7 +128,7 @@ function getInitials(name) {
 }
 
 function StatusBadge({ status }) {
-  if (status === 'complete') return <span className="badge badge--success">✓ 4/4 Poses</span>
+  if (status === 'complete') return <span className="badge badge--success">✓ 4/4 Verified</span>
   if (status === 'in-progress') return <span className="badge badge--warning">◆ In Progress</span>
   return <span className="badge badge--muted">○ Pending</span>
 }
@@ -160,6 +136,7 @@ function StatusBadge({ status }) {
 export default function StudentList({
   onNewStudent,
   onRecaptureStudent,
+  onLockAdmin,
 }) {
   const [students, setStudents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -193,7 +170,7 @@ export default function StudentList({
     try {
       await seedDemoStudents()
       await loadStudents()
-      show('Loaded 3 sample student datasets for demo!', 'success')
+      show('Loaded sample student datasets for demo!', 'success')
     } catch (err) {
       console.error('Demo seed error:', err)
       show('Failed to load demo students', 'error')
@@ -258,12 +235,19 @@ export default function StudentList({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '12px',
-          color: 'var(--text-muted)'
+          gap: '10px',
+          color: 'var(--color-mid-gray)'
         }}>
-          <div style={{ fontSize: '2rem', animation: 'spin 1.2s linear infinite' }}>⏳</div>
-          <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-            Accessing Local Offline Vault…
+          <div style={{
+            width: '24px',
+            height: '24px',
+            border: '2px solid var(--color-hairline)',
+            borderTopColor: 'var(--color-ink)',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite'
+          }} />
+          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-ink)' }}>
+            Loading database records…
           </div>
         </div>
       </div>
@@ -288,16 +272,44 @@ export default function StudentList({
       )}
 
       <div className="page">
-        {/* Top Header Row — only show top "+ New Student" button if students already exist */}
+        {/* Admin Console Protection Header */}
+        <div
+          className="row-between"
+          style={{
+            marginBottom: 'var(--space-4)',
+            padding: '8px 14px',
+            borderRadius: 'var(--r-buttons)',
+            background: 'var(--color-paper)',
+            border: '1px solid var(--color-hairline)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px' }}>🔒</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-ink)' }}>
+              Admin Console · Authenticated
+            </span>
+          </div>
+          <button
+            id="admin-lock-btn"
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={onLockAdmin}
+            style={{ fontSize: '12px', padding: '4px 10px', minHeight: '26px' }}
+          >
+            🔒 Lock Vault / Student Mode
+          </button>
+        </div>
+
+        {/* Top Header Row */}
         <div className="row-between" style={{ marginBottom: 'var(--space-4)' }}>
           <div>
-            <h1 style={{ fontSize: '1.5rem', marginBottom: '2px', letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontSize: '1.5rem', marginBottom: '2px' }}>
               Student Datasets
             </h1>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+            <p style={{ fontSize: '13px', color: 'var(--color-mid-gray)' }}>
               {students.length === 0
-                ? 'Offline biometric collection workstation'
-                : `${completeCount} validated datasets · ${pendingCount} pending capture`}
+                ? 'Admin dataset management console'
+                : `${completeCount} verified datasets · ${pendingCount} pending capture`}
             </p>
           </div>
 
@@ -306,7 +318,6 @@ export default function StudentList({
               id="new-student-btn"
               className="btn btn--primary btn--sm"
               onClick={onNewStudent}
-              style={{ boxShadow: '0 2px 10px var(--accent-glow)' }}
             >
               + Add Student
             </button>
@@ -327,13 +338,13 @@ export default function StudentList({
                 <span className="stat-card-label">Total Roster</span>
                 <span className="stat-card-value">{students.length}</span>
               </div>
-              <div className="stat-card" style={{ borderColor: 'rgba(34, 211, 160, 0.3)' }}>
-                <span className="stat-card-label" style={{ color: 'var(--success)' }}>Complete</span>
-                <span className="stat-card-value" style={{ color: 'var(--success)' }}>{completeCount}</span>
+              <div className="stat-card">
+                <span className="stat-card-label" style={{ color: '#15803d' }}>Verified</span>
+                <span className="stat-card-value" style={{ color: '#15803d' }}>{completeCount}</span>
               </div>
-              <div className="stat-card" style={{ borderColor: 'rgba(245, 158, 11, 0.3)' }}>
-                <span className="stat-card-label" style={{ color: 'var(--warning)' }}>Pending</span>
-                <span className="stat-card-value" style={{ color: 'var(--warning)' }}>{pendingCount}</span>
+              <div className="stat-card">
+                <span className="stat-card-label" style={{ color: '#b45309' }}>Pending</span>
+                <span className="stat-card-value" style={{ color: '#b45309' }}>{pendingCount}</span>
               </div>
             </div>
 
@@ -366,10 +377,10 @@ export default function StudentList({
               style={{
                 gap: '4px',
                 marginBottom: 'var(--space-4)',
-                background: 'var(--bg-surface)',
-                borderRadius: 'var(--r-md)',
-                padding: '4px',
-                border: '1px solid var(--border-subtle)',
+                background: 'var(--color-paper)',
+                borderRadius: 'var(--r-buttons)',
+                padding: '3px',
+                border: '1px solid var(--color-hairline)',
               }}
             >
               {[
@@ -385,16 +396,16 @@ export default function StudentList({
                   onClick={() => setFilter(val)}
                   style={{
                     flex: 1,
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    padding: '6px 8px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    padding: '6px 10px',
+                    minHeight: '28px',
+                    borderRadius: 'var(--r-buttons)',
                     ...(filter === val ? {
-                      background: 'var(--bg-elevated)',
-                      color: 'var(--text-primary)',
-                      borderColor: 'var(--border-accent)',
-                      boxShadow: 'var(--shadow-sm)'
+                      background: 'var(--color-ink)',
+                      color: '#ffffff',
                     } : {
-                      color: 'var(--text-muted)'
+                      color: 'var(--color-mid-gray)'
                     })
                   }}
                 >
@@ -406,8 +417,8 @@ export default function StudentList({
             {/* Student Records List */}
             <div className="stack-2">
               {filtered.length === 0 ? (
-                <div className="card" style={{ textAlign: 'center', padding: 'var(--space-8) 0' }}>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                <div className="card" style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <p style={{ color: 'var(--color-mid-gray)', fontSize: '13px' }}>
                     No students match the current filter or search query.
                   </p>
                 </div>
@@ -431,9 +442,9 @@ export default function StudentList({
                     {/* Student Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontSize: '0.9375rem',
+                        fontSize: '14px',
                         fontWeight: 600,
-                        color: 'var(--text-primary)',
+                        color: 'var(--color-ink)',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -441,24 +452,24 @@ export default function StudentList({
                         {student.name}
                       </div>
                       <div style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--text-muted)',
+                        fontSize: '12px',
+                        color: 'var(--color-mid-gray)',
                         fontFamily: 'var(--font-mono)',
                         marginTop: '2px',
                         display: 'flex',
                         gap: '6px',
                         alignItems: 'center'
                       }}>
-                        <span style={{ color: 'var(--accent-hover)' }}>{student.regNo}</span>
+                        <span style={{ color: 'var(--color-ink-soft)', fontWeight: 500 }}>{student.regNo}</span>
                         <span>•</span>
                         <span>{student.dept} - Sec {student.section}</span>
                       </div>
                     </div>
 
-                    {/* Status Badge & Inspection Indicator */}
+                    {/* Status Badge & Arrow */}
                     <div className="row" style={{ gap: 'var(--space-2)', flexShrink: 0 }}>
                       <StatusBadge status={student.status} />
-                      <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>›</span>
+                      <span style={{ fontSize: '14px', color: 'var(--color-mid-gray)' }}>›</span>
                     </div>
                   </div>
                 ))
@@ -471,20 +482,17 @@ export default function StudentList({
                 className="card"
                 style={{
                   marginTop: 'var(--space-6)',
-                  borderColor: 'var(--border-accent)',
-                  background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(34,211,160,0.08))',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: 'var(--space-4)',
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.35)'
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)', marginBottom: '2px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-ink)', marginBottom: '2px' }}>
                     📦 Export Ready ({completeCount} Student{completeCount > 1 ? 's' : ''})
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--color-mid-gray)', lineHeight: '1.4' }}>
                     {completeCount * 4} validated 720p images with <code className="font-mono">index.csv</code> and per-student <code className="font-mono">metadata.json</code>.
                   </div>
                 </div>
@@ -493,10 +501,7 @@ export default function StudentList({
                   className="btn btn--primary btn--md"
                   onClick={handleExport}
                   disabled={isExporting || completeCount === 0}
-                  style={{
-                    flexShrink: 0,
-                    boxShadow: '0 2px 12px var(--accent-glow)'
-                  }}
+                  style={{ flexShrink: 0 }}
                 >
                   {isExporting ? `Compiling (${exportProgress}%)…` : 'Export ZIP'}
                 </button>
@@ -507,28 +512,27 @@ export default function StudentList({
             <div style={{
               marginTop: 'var(--space-8)',
               paddingTop: 'var(--space-4)',
-              borderTop: '1px solid var(--border-subtle)',
+              borderTop: '1px solid var(--color-hairline)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              fontSize: '0.75rem',
-              color: 'var(--text-muted)'
+              fontSize: '12px',
+              color: 'var(--color-mid-gray)'
             }}>
-              <span>Local Storage: Active</span>
-              <div className="row" style={{ gap: '12px' }}>
+              <span>Local IndexedDB Vault</span>
+              <div className="row" style={{ gap: '8px' }}>
                 <button
                   type="button"
                   onClick={handleSeedDemo}
                   className="btn btn--ghost btn--sm"
-                  style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}
                 >
-                  ⚡ Add Demo Students
+                  ⚡ Add Demo Data
                 </button>
                 <button
                   type="button"
                   onClick={handleClearAll}
                   className="btn btn--ghost btn--sm"
-                  style={{ fontSize: '0.75rem', color: 'var(--danger)' }}
+                  style={{ color: 'var(--color-ember)' }}
                 >
                   Reset Vault
                 </button>
