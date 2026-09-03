@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
-import { getAllStudents } from './db';
+import { getAllStudents, getStudentPhotos } from './db';
+import { isSupabaseConfigured, fetchStudentsFromSupabase, fetchImageBlob } from './supabase';
 
 // Helper to escape CSV fields
 function escapeCSV(field) {
@@ -12,9 +13,46 @@ function escapeCSV(field) {
 }
 
 export async function generateExportZip(onProgress) {
-  const students = await getAllStudents();
-  const completedStudents = students.filter(s => s.status === 'complete');
-  
+  // 1. Merge completed records from both Local IndexedDB and Supabase Cloud
+  const mergedMap = new Map();
+
+  // Local records
+  try {
+    const localStudents = await getAllStudents();
+    for (const s of localStudents) {
+      if (s.status === 'complete') {
+        mergedMap.set(s.regNo, { ...s, source: 'local' });
+      }
+    }
+  } catch (e) {
+    console.warn('Local student fetch error:', e);
+  }
+
+  // Cloud records (from other mobile devices)
+  if (isSupabaseConfigured()) {
+    try {
+      const cloudStudents = await fetchStudentsFromSupabase();
+      for (const s of cloudStudents) {
+        if (s.status === 'complete') {
+          if (!mergedMap.has(s.regNo)) {
+            mergedMap.set(s.regNo, { ...s, source: 'cloud' });
+          } else {
+            // Merge cloud photoUrls if local is missing blobs
+            const existing = mergedMap.get(s.regNo);
+            mergedMap.set(s.regNo, {
+              ...existing,
+              photoUrls: s.photoUrls || existing.photoUrls,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Cloud student fetch error:', e);
+    }
+  }
+
+  const completedStudents = Array.from(mergedMap.values());
+
   if (completedStudents.length === 0) {
     throw new Error('No completed student datasets found to export.');
   }
@@ -25,28 +63,53 @@ export async function generateExportZip(onProgress) {
 
   for (let i = 0; i < completedStudents.length; i++) {
     const student = completedStudents[i];
-    
-    // Progress callback (e.g., 0 to 100)
+
     if (onProgress) {
       onProgress(Math.round(((i) / completedStudents.length) * 100));
     }
 
-    // Format: 21IT001_JohnDoe
     const cleanName = student.name.replace(/[^a-zA-Z0-9]/g, '');
-    const folderName = `${student.regNo}_${cleanName}`;
+    const folderName = `${student.regNo}_${cleanName || 'Student'}`;
     const studentFolder = studentsFolder.folder(folderName);
-    
-    // Save images (blobs)
-    const images = student.photos; // The blob data from db
-    if (!images || !images.front || !images.left || !images.right || !images.overall) {
-      console.warn(`Skipping ${student.regNo} due to missing photos`);
-      continue; // Skip if missing required photos
+
+    // Retrieve 4 image blobs (from IndexedDB or Supabase Cloud)
+    let images = student.photos;
+    if (!images) {
+      try {
+        images = await getStudentPhotos(student.regNo);
+      } catch (e) {
+        images = null;
+      }
     }
 
-    studentFolder.file('front.jpg', images.front);
-    studentFolder.file('left.jpg', images.left);
-    studentFolder.file('right.jpg', images.right);
-    studentFolder.file('overall.jpg', images.overall);
+    const poses = ['front', 'left', 'right', 'overall'];
+    let validCount = 0;
+
+    for (const pose of poses) {
+      let blob = null;
+      if (images && images[pose]) {
+        blob = images[pose].blob || images[pose];
+      }
+
+      // Fallback: download from Supabase storage URL
+      if (!blob && student.photoUrls && student.photoUrls[pose]) {
+        try {
+          blob = await fetchImageBlob(student.photoUrls[pose]);
+        } catch (downloadErr) {
+          console.warn(`Failed to download ${pose} for ${student.regNo}:`, downloadErr);
+        }
+      }
+
+      if (blob) {
+        studentFolder.file(`${pose}.jpg`, blob);
+        validCount++;
+      }
+    }
+
+    if (validCount === 0) {
+      console.warn(`Skipping ${student.regNo} due to missing photos`);
+      continue;
+    }
 
     // Create metadata.json for the student
     const metadata = {
@@ -55,19 +118,18 @@ export async function generateExportZip(onProgress) {
       dept: student.dept,
       section: student.section,
       email: student.email,
-      capturedAt: student.timestamp || new Date().toISOString(),
+      capturedAt: student.createdAt || student.capturedAt || new Date().toISOString(),
       images: {
         front: 'front.jpg',
         left: 'left.jpg',
         right: 'right.jpg',
-        overall: 'overall.jpg'
+        overall: 'overall.jpg',
       },
-      qualityChecksPassed: true
+      qualityChecksPassed: true,
     };
-    
+
     studentFolder.file('metadata.json', JSON.stringify(metadata, null, 2));
 
-    // Prepare index data for CSV/JSON
     indexData.push({
       regNo: metadata.regNo,
       name: metadata.name,
@@ -78,7 +140,7 @@ export async function generateExportZip(onProgress) {
       left: `students/${folderName}/left.jpg`,
       right: `students/${folderName}/right.jpg`,
       overall: `students/${folderName}/overall.jpg`,
-      capturedAt: metadata.capturedAt
+      capturedAt: metadata.capturedAt,
     });
   }
 
@@ -92,10 +154,9 @@ export async function generateExportZip(onProgress) {
   });
   const csvContent = [csvHeaders.join(','), ...csvRows].join('\n');
   zip.file('index.csv', csvContent);
-  
+
   if (onProgress) onProgress(100);
 
-  // Generate the final zip file Blob
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   return zipBlob;
 }
@@ -103,13 +164,21 @@ export async function generateExportZip(onProgress) {
 export async function generateSingleStudentZip(student, photos) {
   const zip = new JSZip();
   const cleanName = student.name.replace(/[^a-zA-Z0-9]/g, '');
-  const folderName = `${student.regNo}_${cleanName}`;
+  const folderName = `${student.regNo}_${cleanName || 'Student'}`;
   const studentFolder = zip.folder(folderName);
 
   const poses = ['front', 'left', 'right', 'overall'];
   for (const pose of poses) {
-    if (photos[pose] && photos[pose].blob) {
-      studentFolder.file(`${pose}.jpg`, photos[pose].blob);
+    let blob = photos[pose]?.blob || photos[pose];
+    if (!blob && student.photoUrls && student.photoUrls[pose]) {
+      try {
+        blob = await fetchImageBlob(student.photoUrls[pose]);
+      } catch (err) {
+        console.warn(`Error fetching ${pose} blob:`, err);
+      }
+    }
+    if (blob) {
+      studentFolder.file(`${pose}.jpg`, blob);
     }
   }
 
@@ -119,14 +188,14 @@ export async function generateSingleStudentZip(student, photos) {
     dept: student.dept,
     section: student.section,
     email: student.email,
-    capturedAt: student.capturedAt || new Date().toISOString(),
+    capturedAt: student.capturedAt || student.createdAt || new Date().toISOString(),
     images: {
       front: 'front.jpg',
       left: 'left.jpg',
       right: 'right.jpg',
-      overall: 'overall.jpg'
+      overall: 'overall.jpg',
     },
-    qualityChecksPassed: true
+    qualityChecksPassed: true,
   };
   studentFolder.file('metadata.json', JSON.stringify(metadata, null, 2));
 
@@ -143,4 +212,3 @@ export function downloadBlob(blob, filename) {
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
-

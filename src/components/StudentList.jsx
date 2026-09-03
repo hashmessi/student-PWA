@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getAllStudents, deleteStudent, seedDemoStudents, clearAllStudents } from '../lib/db'
+import { isSupabaseConfigured, fetchStudentsFromSupabase } from '../lib/supabase'
 import { useToast } from './ToastContext'
 import StudentDetailModal from './StudentDetailModal'
+import CloudConfigModal from './CloudConfigModal'
 import { generateExportZip, downloadBlob } from '../lib/exportEngine'
 
-function EmptyState({ onNewStudent, onSeedDemo, isSeeding }) {
+function EmptyState({ onNewStudent, onSeedDemo, isSeeding, onOpenCloud }) {
+  const isCloud = isSupabaseConfigured()
   return (
     <div
       className="card"
@@ -142,6 +145,7 @@ export default function StudentList({
   const [loading, setLoading] = useState(true)
   const [isSeeding, setIsSeeding] = useState(false)
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState(null)
+  const [showCloudModal, setShowCloudModal] = useState(false)
   const [filter, setFilter] = useState('all') // 'all' | 'complete' | 'pending'
   const [searchQuery, setSearchQuery] = useState('')
   const [isExporting, setIsExporting] = useState(false)
@@ -151,8 +155,40 @@ export default function StudentList({
   const loadStudents = useCallback(async () => {
     setLoading(true)
     try {
-      const all = await getAllStudents()
-      setStudents(all)
+      const mergedMap = new Map()
+
+      // 1. Load Local IndexedDB records
+      try {
+        const local = await getAllStudents()
+        for (const s of local) {
+          mergedMap.set(s.regNo, { ...s, source: 'local' })
+        }
+      } catch (localErr) {
+        console.warn('Local DB fetch warning:', localErr)
+      }
+
+      // 2. Load Supabase Cloud records (from other mobile devices)
+      if (isSupabaseConfigured()) {
+        try {
+          const cloud = await fetchStudentsFromSupabase()
+          for (const s of cloud) {
+            if (!mergedMap.has(s.regNo)) {
+              mergedMap.set(s.regNo, s)
+            } else {
+              const existing = mergedMap.get(s.regNo)
+              mergedMap.set(s.regNo, {
+                ...existing,
+                photoUrls: s.photoUrls || existing.photoUrls,
+                isCloud: true,
+              })
+            }
+          }
+        } catch (cloudErr) {
+          console.warn('Cloud DB fetch warning:', cloudErr)
+        }
+      }
+
+      setStudents(Array.from(mergedMap.values()))
     } catch (err) {
       console.error('Failed to load students:', err)
       show('Failed to load students from database', 'error')
@@ -212,6 +248,7 @@ export default function StudentList({
 
   const completeCount = students.filter(s => s.status === 'complete').length
   const pendingCount = students.length - completeCount
+  const isCloudActive = isSupabaseConfigured()
 
   const filtered = students.filter(s => {
     if (filter === 'complete' && s.status !== 'complete') return false
@@ -256,6 +293,13 @@ export default function StudentList({
 
   return (
     <>
+      {/* Cloud Configuration Modal */}
+      <CloudConfigModal
+        isOpen={showCloudModal}
+        onClose={() => setShowCloudModal(false)}
+        onConfigSaved={() => loadStudents()}
+      />
+
       {/* Student Dataset Inspector Modal */}
       {selectedStudentForDetail && (
         <StudentDetailModal
@@ -281,6 +325,8 @@ export default function StudentList({
             borderRadius: 'var(--r-buttons)',
             background: 'var(--color-paper)',
             border: '1px solid var(--color-hairline)',
+            flexWrap: 'wrap',
+            gap: '8px',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -289,15 +335,28 @@ export default function StudentList({
               Admin Console · Authenticated
             </span>
           </div>
-          <button
-            id="admin-lock-btn"
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={onLockAdmin}
-            style={{ fontSize: '12px', padding: '4px 10px', minHeight: '26px' }}
-          >
-            🔒 Lock Vault / Student Mode
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              id="admin-cloud-config-btn"
+              type="button"
+              className={`btn btn--sm ${isCloudActive ? 'btn--secondary' : 'btn--ghost'}`}
+              onClick={() => setShowCloudModal(true)}
+              style={{ fontSize: '12px', padding: '4px 10px', minHeight: '26px' }}
+            >
+              <span>☁️</span>
+              <span>{isCloudActive ? 'Cloud Sync: Active' : 'Configure Cloud Sync'}</span>
+            </button>
+            <button
+              id="admin-lock-btn"
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={onLockAdmin}
+              style={{ fontSize: '12px', padding: '4px 10px', minHeight: '26px' }}
+            >
+              🔒 Lock Vault
+            </button>
+          </div>
         </div>
 
         {/* Top Header Row */}
@@ -468,6 +527,11 @@ export default function StudentList({
 
                     {/* Status Badge & Arrow */}
                     <div className="row" style={{ gap: 'var(--space-2)', flexShrink: 0 }}>
+                      {student.isCloud && (
+                        <span className="badge badge--muted" style={{ fontSize: '10px', padding: '2px 6px' }} title="Synced from mobile phone via Cloud">
+                          ☁️ Cloud
+                        </span>
+                      )}
                       <StatusBadge status={student.status} />
                       <span style={{ fontSize: '14px', color: 'var(--color-mid-gray)' }}>›</span>
                     </div>

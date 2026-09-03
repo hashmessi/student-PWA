@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { getStudentPhotos, deleteStudent } from '../lib/db'
 import { useToast } from './ToastContext'
 import { generateSingleStudentZip, downloadBlob } from '../lib/exportEngine'
+import { isSupabaseConfigured, deleteStudentFromSupabase } from '../lib/supabase'
 
 const POSE_INFO = {
   front: { title: 'Front Pose', icon: '👤', angle: '0° Neutral' },
@@ -29,8 +30,23 @@ export default function StudentDetailModal({
     async function load() {
       setLoading(true)
       try {
-        const result = await getStudentPhotos(student.regNo)
-        if (mounted) setPhotos(result)
+        let result = await getStudentPhotos(student.regNo)
+
+        // Fallback: If local IndexedDB doesn't have photos, use Supabase cloud photo URLs
+        if ((!result || Object.keys(result).length === 0) && student.photoUrls) {
+          result = {}
+          for (const [pose, url] of Object.entries(student.photoUrls)) {
+            if (url) {
+              result[pose] = {
+                dataUrl: url,
+                pose,
+                qualityScore: student.qualityScores?.[pose] || {},
+              }
+            }
+          }
+        }
+
+        if (mounted) setPhotos(result || {})
       } catch (err) {
         console.error('Failed to load student photos:', err)
         show('Failed to retrieve photos from database', 'error')
@@ -40,11 +56,20 @@ export default function StudentDetailModal({
     }
     load()
     return () => { mounted = false }
-  }, [student.regNo, show])
+  }, [student.regNo, student.photoUrls, student.qualityScores, show])
 
   const handleDelete = async () => {
     try {
       await deleteStudent(student.regNo)
+
+      if (isSupabaseConfigured()) {
+        try {
+          await deleteStudentFromSupabase(student.regNo)
+        } catch (cloudErr) {
+          console.warn('Cloud delete warning:', cloudErr)
+        }
+      }
+
       show(`Deleted ${student.name} (${student.regNo})`, 'success')
       onDeleted(student.regNo)
       onClose()

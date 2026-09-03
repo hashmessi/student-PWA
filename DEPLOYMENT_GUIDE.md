@@ -9,9 +9,30 @@ A step-by-step guide for deploying the **Student Face Dataset Collection Progres
 Unlike standard web applications with backend servers (e.g. Render container web services) that spin down on inactivity and purge local files on restart, this application is engineered as a **100% Client-Side Static Progressive Web App (PWA)**:
 
 - **Zero Server Restarts**: The application is served from static edge CDN nodes. The deployment link remains **live 24/7/365 indefinitely**.
-- **100% Offline Persistence**: Student photos and metadata are stored directly in the browser's persistent **IndexedDB (`FaceCaptureDB`)** storage. No server database is required.
-- **In-Browser Neural Processing**: Face detection and landmark models (`TinyFaceDetector` + `68-point landmarks`) execute via browser WebAssembly (WASM).
-- **Secure Sandbox**: Student dataset exports and admin functions are protected by cryptographic SHA-256 salted passcode verification (**Passcode: `2456`**).
+- **Multi-Device Student Cloud Sync**: Students can open the link on their **individual mobile phones**, capture their 4 photos, and submit. The photos upload directly to your central **Supabase Cloud Vault**.
+- **100% Offline Persistence**: Even without network, photos are stored in local **IndexedDB (`FaceCaptureDB`)**.
+- **In-Browser Neural Processing**: Face detection and landmark models (`TinyFaceDetector` + `68-point landmarks`) execute in-browser via WebAssembly (WASM).
+- **Secure Sandbox & Master ZIP**: Only you (Admin with **Passcode: `2456`**) can access the complete student roster and download the master dataset ZIP on your computer.
+
+---
+
+## ☁️ Step 1: Setting Up Free Central Cloud Vault (Supabase — 3 Minutes)
+
+To collect datasets from multiple individual student mobile phones into your Admin Console:
+
+1. **Create a Free Supabase Project**:
+   - Go to [supabase.com](https://supabase.com) and create a free project.
+2. **Run the 1-Click Database & Storage Script**:
+   - Go to **SQL Editor** in your Supabase project dashboard.
+   - Copy the contents of [`supabase_schema.sql`](file:///c:/Users/Hashvanth/Student%20PWA/supabase_schema.sql) and paste it into the editor.
+   - Click **Run**. This automatically creates:
+     - The `students` table with security policies.
+     - The `student-faces` storage bucket for 720p photo uploads.
+3. **Connect to the App**:
+   - In Supabase, go to **Project Settings** $\rightarrow$ **API**.
+   - Copy your **Project URL** and **`anon` `public` Key**.
+   - Open your deployed app $\rightarrow$ Click **`🔒 Admin Vault`** $\rightarrow$ Enter passcode `2456` $\rightarrow$ Click **`☁️ Configure Cloud Sync`** $\rightarrow$ Paste your URL & Key $\rightarrow$ Click **Save & Sync Roster**.
+   - *(Optional: You can also set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` as Environment Variables in Vercel settings!)*
 
 ---
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { saveStudentCompleteDataset } from '../lib/db'
+import { isSupabaseConfigured, uploadStudentToSupabase } from '../lib/supabase'
 import { useToast } from './ToastContext'
 
 const POSE_INFO = {
@@ -17,8 +18,22 @@ export default function ReviewScreen({ student, captures, onRetakePose, onCancel
   const handleSaveAndConfirm = async () => {
     setIsSaving(true)
     try {
+      // 1. Save to local IndexedDB (instant offline storage)
       const saved = await saveStudentCompleteDataset(student, captures)
-      show(`Dataset for ${student.name} saved to offline database!`, 'success')
+
+      // 2. If Supabase is connected, upload to central cloud vault
+      if (isSupabaseConfigured()) {
+        try {
+          await uploadStudentToSupabase(student, captures)
+          show(`Dataset for ${student.name} saved & synced to Cloud Vault!`, 'success')
+        } catch (cloudErr) {
+          console.warn('Cloud sync error (saved locally):', cloudErr)
+          show(`Saved to local device (Cloud sync will retry)`, 'warning')
+        }
+      } else {
+        show(`Dataset for ${student.name} saved successfully!`, 'success')
+      }
+
       onSaved(saved)
     } catch (err) {
       console.error('Error saving captured dataset:', err)

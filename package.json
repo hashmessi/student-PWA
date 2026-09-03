@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.115.0",
     "@vladmandic/face-api": "^1.7.15",
     "idb": "^8.0.2",
     "jszip": "^3.10.1",
