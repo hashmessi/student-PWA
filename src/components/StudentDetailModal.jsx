@@ -88,7 +88,7 @@ export default function StudentDetailModal({
       show(`Exported dataset for ${student.name}`, 'success')
     } catch (err) {
       console.error('Single export error:', err)
-      show('Failed to export student dataset', 'error')
+      show(err.message || 'Failed to export student dataset', 'error')
     } finally {
       setIsExporting(false)
     }
